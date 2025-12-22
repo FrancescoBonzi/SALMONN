@@ -1,7 +1,7 @@
 # LibriSpeech ASR Training Config for SALMONN
 
 model:
-  # Model paths (download with: python scripts/download_pretrained.py)
+  # Model paths (download with: python recipes/download_pretrained.sh)
   llama_path: "pretrained/vicuna-13b-v1.1"
   whisper_path: "pretrained/whisper-large-v2"
   beats_path: "pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"
@@ -36,7 +36,6 @@ model:
   end_sym: "</s>"
 
 datasets:
-  # These paths are relative to project root (created by prepare_librispeech.py)
   train_ann_path: "data/librispeech/train_librispeech.json"
   valid_ann_path: "data/librispeech/valid_librispeech.json"
   test_ann_path: "data/librispeech/test_librispeech.json"
@@ -50,9 +49,9 @@ run:
 
   log_freq: 10
   epoch_based: False
-  iters_per_epoch: 5000  # ~281k samples / batch_size / accum = iterations per epoch
-  accum_grad_iters: 4    # Gradient accumulation steps
-  batch_size_train: 8    # Adjust based on GPU memory (4 for 24GB, 8 for 48GB+)
+  iters_per_epoch: 5000
+  accum_grad_iters: 4
+  batch_size_train: 8
   batch_size_eval: 8
   num_workers: 4
 
@@ -62,7 +61,6 @@ run:
   world_size: 1
   dist_url: "env://"
 
-  # Optimizer & scheduler
   optims:
     max_epoch: 10
     warmup_steps: 1000

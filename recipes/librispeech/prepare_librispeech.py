@@ -44,7 +44,7 @@ def prepare_librispeech_annotations(output_dir: str, download_dir: str = "./data
             )
             
             train_annotations.append({
-                "path": str(Path(audio_path).absolute()),
+                "path": audio_path,  # Keep relative path for portability
                 "text": transcript.lower(),  # LibriSpeech text is uppercase
                 "task": "asr"
             })
@@ -74,7 +74,7 @@ def prepare_librispeech_annotations(output_dir: str, download_dir: str = "./data
         )
         
         val_annotations.append({
-            "path": str(Path(audio_path).absolute()),
+            "path": audio_path,
             "text": transcript.lower(),
             "task": "asr"
         })
@@ -101,7 +101,7 @@ def prepare_librispeech_annotations(output_dir: str, download_dir: str = "./data
         )
         
         test_annotations.append({
-            "path": str(Path(audio_path).absolute()),
+            "path": audio_path,
             "text": transcript.lower(),
             "task": "asr"
         })
