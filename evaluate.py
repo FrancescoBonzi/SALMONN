@@ -108,7 +108,7 @@ def main():
             
             # Generate transcriptions
             with torch.amp.autocast('cuda', dtype=torch.float16):
-                hypotheses = model.generate(batch, cfg.config.generate, prompts=prompts)[0]
+                hypotheses = model.generate(batch, cfg.config.generate, prompts=prompts)
             
             references = batch["text"]
             ids = batch["id"]
@@ -116,7 +116,7 @@ def main():
             # Store results
             for ref, hyp, uid in zip(references, hypotheses, ids):
                 # Clean up hypothesis (remove special tokens, extra whitespace)
-                hyp_clean = hyp.replace("</s>", "").replace("<s>", "").strip()
+                hyp_clean = hyp.replace("</s>", "").replace("<s>", "").replace("<unk>", "").strip()
                 
                 all_refs.append(ref)
                 all_hyps.append(hyp_clean)
