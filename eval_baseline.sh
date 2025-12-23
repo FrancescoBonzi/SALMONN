@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=12:0:0
+#SBATCH --time=3:0:0
 #SBATCH --account=aip-csubakan
 #SBATCH --cpus-per-task=48
 #SBATCH --mem=488G
@@ -50,23 +50,6 @@ sed -i "s|[^\"]*data/LibriSpeech|$SLURM_TMPDIR/data/LibriSpeech|g" "$SLURM_TMPDI
 module load StdEnv/2023 cuda/12.2
 module load httpproxy
 source .venv/bin/activate
-
-# Run training
-echo "Starting training..."
-
-torchrun --nproc_per_node=4 train.py --cfg-path recipes/librispeech/baseline.yaml \
-    --options \
-    model.llama_path="$SLURM_TMPDIR/pretrained/vicuna-13b-v1.1" \
-    model.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
-    model.beats_path="$SLURM_TMPDIR/pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" \
-    datasets.train_ann_path="$SLURM_TMPDIR/data/librispeech/train_librispeech.json" \
-    datasets.valid_ann_path="$SLURM_TMPDIR/data/librispeech/valid_librispeech.json" \
-    datasets.test_ann_path="$SLURM_TMPDIR/data/librispeech/test_librispeech.json" \
-    datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
-    run.seed="$seed" \
-    run.num_workers="$SLURM_CPUS_PER_TASK"
-
-echo "Training finished at $(date)"
 
 # Run evaluation on the best checkpoint
 echo "Starting evaluation..."
