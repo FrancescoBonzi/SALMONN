@@ -1,14 +1,3 @@
-"""
-Evaluate SALMONN ASR performance with WER/CER metrics.
-
-Usage:
-    python evaluate.py \
-        --cfg-path recipes/librispeech/baseline.yaml \
-        --ckpt outputs/librispeech_asr/202512221712/checkpoint_best.pth \
-        --split test \
-        --output-dir eval_results
-"""
-
 import argparse
 import json
 import os
@@ -61,18 +50,8 @@ def parse_args():
 
 def main():
     args = parse_args()
-    
-    # Load config
     cfg = Config(args)
-    model_config = cfg.config.model
-    data_config = cfg.config.datasets
-    
-    # Override checkpoint path
-    model_config.ckpt = args.ckpt
-    
-    # Create output directory
-    os.makedirs(args.output_dir, exist_ok=True)
-    
+
     print("=" * 60)
     print("SALMONN ASR Evaluation")
     print("=" * 60)
@@ -80,14 +59,13 @@ def main():
     print(f"Split: {args.split}")
     print(f"Device: {args.device}")
     print("=" * 60)
-    
-    # Load model
-    print("Loading model...")
-    model = SALMONN.from_config(model_config)
+
+    model = SALMONN.from_config(cfg.config.model)
     model.to(args.device)
     model.eval()
     
     # Load dataset
+    data_config = cfg.config.datasets
     if args.split == "test":
         ann_path = data_config.test_ann_path
     else:
@@ -104,20 +82,8 @@ def main():
         pin_memory=True,
     )
     
-    # Generation config (matching paper settings)
-    generate_cfg = {
-        "max_new_tokens": 200,
-        "num_beams": 4,        # Beam search as in the paper
-        "do_sample": False,
-        "min_length": 1,
-        "temperature": 1.0,
-        "top_p": 0.9,
-        "repetition_penalty": 1.0,
-        "length_penalty": 1.0,
-    }
-    
     # ASR prompt (from test_prompt.json)
-    prompt_template = model_config.prompt_template
+    prompt_template = cfg.config.model.prompt_template
     asr_prompt = "<Speech><SpeechHere></Speech> Recognize the speech and give me the transcription."
     
     # Run inference
@@ -137,8 +103,8 @@ def main():
             prompts = [prompt_template.format(asr_prompt)] * len(batch["text"])
             
             # Generate transcriptions
-            with torch.cuda.amp.autocast(dtype=torch.float16):
-                hypotheses = model.generate(batch, generate_cfg, prompts=prompts)
+            with torch.amp.autocast('cuda', dtype=torch.float16):
+                hypotheses = model.generate(batch, cfg.config.generate, prompts=prompts)[0]
             
             references = batch["text"]
             ids = batch["id"]
@@ -191,7 +157,7 @@ def main():
         "num_samples": len(all_refs),
         "wer": overall_wer,
         "cer": overall_cer,
-        "generate_config": generate_cfg,
+        "generate_config": cfg.config.generate,
         "paper_comparison": {
             "salmonn_test_clean_wer": 2.1,
             "salmonn_test_other_wer": 4.9,
@@ -220,4 +186,13 @@ def main():
 
 
 if __name__ == "__main__":
+    """
+    Evaluate SALMONN ASR performance with WER/CER metrics.
+
+    Usage:
+        python evaluate.py \
+            --cfg-path recipes/librispeech/baseline.yaml \
+            --ckpt <checkpoint_path> \
+            --split test
+    """
     main()

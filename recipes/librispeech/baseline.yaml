@@ -70,3 +70,12 @@ run:
     weight_decay: 0.05
     beta2: 0.999
 
+generate:
+  max_new_tokens: 200
+  num_beams: 4
+  do_sample: False
+  min_length: 1
+  temperature: 1.0
+  top_p: 0.9
+  repetition_penalty: 1.0
+  length_penalty: 1.0
