@@ -8,6 +8,7 @@ from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
 from jiwer import wer, cer
+from omegaconf import OmegaConf
 
 from config import Config
 from models.salmonn import SALMONN
@@ -60,6 +61,9 @@ def main():
     print(f"Device: {args.device}")
     print("=" * 60)
 
+    # Set checkpoint path in config so from_config loads it automatically
+    cfg.config.model.ckpt = args.ckpt
+    
     model = SALMONN.from_config(cfg.config.model)
     model.to(args.device)
     model.eval()
@@ -159,7 +163,7 @@ def main():
         "num_samples": len(all_refs),
         "wer": overall_wer,
         "cer": overall_cer,
-        "generate_config": cfg.config.generate,
+        "generate_config": OmegaConf.to_container(cfg.config.generate),
         "paper_comparison": {
             "salmonn_test_clean_wer": 2.1,
             "salmonn_test_other_wer": 4.9,
