@@ -151,6 +151,8 @@ def main():
     print("-" * 60)
     
     # Save results
+    os.makedirs(args.output_dir, exist_ok=True)
+    
     results_summary = {
         "checkpoint": args.ckpt,
         "split": args.split,

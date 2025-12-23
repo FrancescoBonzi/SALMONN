@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=10:0:0
+#SBATCH --time=12:0:0
 #SBATCH --account=aip-csubakan
 #SBATCH --cpus-per-task=48
 #SBATCH --mem=488G
@@ -66,4 +66,35 @@ torchrun --nproc_per_node=4 train.py --cfg-path recipes/librispeech/baseline.yam
     run.seed="$seed" \
     run.num_workers="$SLURM_CPUS_PER_TASK"
 
+echo "Training finished at $(date)"
+
+# Run evaluation on the best checkpoint
+echo "Starting evaluation..."
+
+# Find the output directory
+OUTPUT_DIR="outputs/librispeech_asr"/*
+BEST_CKPT="${OUTPUT_DIR}/checkpoint_best.pth"
+EVAL_OUTPUT="${OUTPUT_DIR}/eval_results"
+
+echo "Using checkpoint: $BEST_CKPT"
+echo "Saving evaluation results to: $EVAL_OUTPUT"
+
+mkdir -p "$EVAL_OUTPUT"
+
+python evaluate.py \
+    --cfg-path recipes/librispeech/baseline.yaml \
+    --ckpt "$BEST_CKPT" \
+    --split test \
+    --batch-size 8 \
+    --num-workers "$SLURM_CPUS_PER_TASK" \
+    --device cuda:0 \
+    --output-dir "$EVAL_OUTPUT" \
+    --options \
+    model.llama_path="$SLURM_TMPDIR/pretrained/vicuna-13b-v1.1" \
+    model.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
+    model.beats_path="$SLURM_TMPDIR/pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" \
+    datasets.test_ann_path="$SLURM_TMPDIR/data/librispeech/test_librispeech.json" \
+    datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2"
+
+echo "Evaluation finished at $(date)"
 echo "Job finished at $(date)"
