@@ -166,3 +166,7 @@ launch.sh
 /output
 arnold.sh
 /configs_local
+
+.vscode/
+pretrained/
+outputs/
