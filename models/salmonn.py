@@ -16,6 +16,7 @@ import logging
 import json
 import contextlib
 import random
+import numpy as np
 
 import torch
 import torch.nn as nn
@@ -504,3 +505,210 @@ class SALMONN(nn.Module):
             model.load_state_dict(ckpt['model'], strict=False)
 
         return model
+
+
+class MutorSALMONN(SALMONN):
+    def __init__(self, min_offset=1, max_offset=4, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.min_offset = min_offset
+        self.max_offset = max_offset
+
+        # Add register token to the tokenizer
+        self.llama_tokenizer.add_special_tokens({"additional_special_tokens": ["<reg>"]})
+        self.llama_tokenizer.register_token_id = self.llama_tokenizer.convert_tokens_to_ids("<reg>")
+        self.llama_model.resize_token_embeddings(len(self.llama_tokenizer))
+    
+    def forward(self, samples, verbose=False):
+        if not self.training:
+            return super().forward(samples, verbose)
+
+        # detect whether there are multi tasks in this batch
+        task = list(set(samples["task"]))
+        if len(task) > 1 or "QA" in task:
+            self.multi_prompt = True
+
+        # prepare prompts
+        if self.prompt_dict:
+            if self.multi_prompt:
+                prompt = [random.choice(self.prompt_dict[task]) for task in samples["task"]]
+                if "Q" in samples:
+                    prompt = [p.format(q) if '{}' in p else p for p, q in zip(prompt, samples["Q"]) ]
+            else:
+                prompt = random.choice(self.prompt_dict[samples["task"][0]])
+
+        # use speech/audio encoder to encode speech/audio
+        spectrogram = samples["spectrogram"]
+        raw_wav = samples.get("raw_wav", None)
+        audio_padding_mask = samples.get("padding_mask", None)
+
+        speech_embeds, speech_atts = self.encode_speech(spectrogram, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask)
+
+        # wrap speech_embeds with prompts
+        if self.prompt_dict:
+            speech_embeds, speech_atts = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt)
+        
+        # prepare inputs for LLM
+        text = [t + self.end_sym for t in samples["text"]]
+        to_regress_tokens = self.llama_tokenizer(
+            text,
+            return_tensors="pt",
+            padding="longest",
+            truncation=True,
+            max_length=self.max_txt_len,
+            add_special_tokens=False
+        ).to(spectrogram.device)
+
+        ### Add register token within the text ###
+        
+        batch_size = to_regress_tokens.input_ids.shape[0]
+        device = to_regress_tokens.input_ids.device
+
+        # Sample offset d uniformly (offset = d - 1 in the code)
+        offset = np.random.randint(self.min_offset, self.max_offset + 1)           
+
+        input_ids = []
+        attention_mask_4d = []
+        reg_token_indices_batch = []
+        real_token_indices_batch = []
+
+        for i in range(batch_size):
+            answer_part_tensor = to_regress_tokens.input_ids[i]
+            attention_mask = to_regress_tokens.attention_mask[i]
+
+            # Create register tokens (same ID for all)
+            reg_tokens = torch.full_like(answer_part_tensor, self.llama_tokenizer.register_token_id)
+            
+            # INTERLEAVE: Stack registers and answer tokens, then flatten
+            # Result: [r, x1, r, x2, r, x3, ...]
+            interleaved_answer = torch.stack([reg_tokens, answer_part_tensor], dim=1).flatten(0)
+            double_attention_mask = attention_mask.repeat_interleave(2)
+            double_sequence_len = double_attention_mask.shape[0]
+
+            # Track indices of register tokens and real tokens
+            reg_token_indices = torch.arange(0, len(interleaved_answer), 2, device=device)
+            total_len = interleaved_answer.size(0)
+            all_indices = torch.arange(total_len, device=device)
+            real_token_mask = torch.ones(total_len, dtype=bool, device=device)
+            real_token_mask[reg_token_indices] = False
+            real_token_indices = all_indices[real_token_mask]
+
+            # Create custom attention for the interleaved sequences
+            mask_auxiliary = torch.ones([double_sequence_len, double_sequence_len], dtype=torch.float32, device=device)
+            mask_auxiliary = torch.tril(mask_auxiliary, diagonal=-1) * double_attention_mask.unsqueeze(1)
+
+            # Register tokens cannot attend to other register tokens
+            mask_auxiliary[:, ~real_token_mask] = 0.0
+            # Restore the diagonal of the mask
+            mask_auxiliary.diagonal(dim1=0, dim2=1).fill_(1.0)
+
+            input_ids.append(interleaved_answer)
+            attention_mask_4d.append(mask_auxiliary)
+            reg_token_indices_batch.append(reg_token_indices)
+            real_token_indices_batch.append(real_token_indices)
+
+        # Update batch with interleaved sequences
+        input_ids = torch.stack(input_ids)  # [B, new_seq_len]
+        attention_mask_4d = torch.stack(attention_mask_4d).unsqueeze(1)  # [B, 1, new_seq_len, new_seq_len]
+        reg_token_indices_batch = torch.stack(reg_token_indices_batch)
+        real_token_indices_batch = torch.stack(real_token_indices_batch)
+
+        to_regress_embeds = self.llama_model.model.embed_tokens(input_ids) if not self.lora else self.llama_model.model.model.embed_tokens(input_ids)
+
+        ### Construct labels accordingly to the interleaved sequences ###
+
+        targets = input_ids.clone().roll(-2, dims=1)
+        targets[targets == self.llama_tokenizer.pad_token_id] = -100
+        targets[:, -1] = -100
+        to_regress_position_ids = torch.arange(input_ids.shape[1] // 2, device=input_ids.device).repeat_interleave(2).unsqueeze(0).repeat(batch_size, 1)
+
+        reg_position_ids_batch = []
+        for i in range(batch_size):
+            reg_indices = reg_token_indices_batch[i]
+
+            # Compute target indices for each register
+            j_tensor = torch.arange(len(reg_indices), device=device)
+            target_indices = reg_indices + 1 + 2 * offset  # Target is offset steps ahead
+            reg_positions = j_tensor + offset - 1  # Position IDs for registers
+
+            # Mask: target index must be in bounds
+            valid_targets_mask = target_indices < double_sequence_len
+
+            # Assign labels: register predicts the token at target_indices
+            targets[i, reg_indices[valid_targets_mask]] = input_ids[i, target_indices[valid_targets_mask]]
+            targets[i, reg_indices[~valid_targets_mask]] = -100  # Mask out-of-bounds
+
+            # Store position IDs for registers
+            last_valid_pos = len(real_token_indices_batch[i]) - 1
+            reg_position_ids = torch.where(
+                valid_targets_mask,
+                reg_positions,
+                torch.full_like(reg_positions, last_valid_pos)
+            )
+            reg_position_ids_batch.append(reg_position_ids)
+
+            # Update position IDs for registers
+            to_regress_position_ids[i, reg_token_indices_batch[i]] = reg_position_ids_batch[i]
+
+        empty_targets = (
+            torch.ones(
+                [speech_atts.shape[0], speech_atts.shape[1] + 1],
+                dtype=torch.long,
+                device=device,
+            ).fill_(-100)
+        )
+        targets = torch.cat([empty_targets, targets], dim=1)
+
+        ### Construct inputs for LLM ###
+
+        bos = torch.ones(
+            [batch_size, 1],
+            dtype=torch.long,
+            device=device,
+        ) * self.llama_tokenizer.bos_token_id
+        bos_embeds = self.llama_model.model.embed_tokens(bos) if not self.lora else self.llama_model.model.model.embed_tokens(bos)
+
+        # Construct inputs for LLM
+        inputs_embeds = torch.cat([bos_embeds, speech_embeds, to_regress_embeds], dim=1)
+
+        # Construct attention mask for the interleaved sequences
+        total_len = bos_embeds.shape[1] + speech_embeds.shape[1] + to_regress_embeds.shape[1]
+        start_regress = bos_embeds.shape[1] + speech_embeds.shape[1]
+
+        # Create base 4D mask with 1s (attend) - will use causal masking from LLaMA
+        mask_4d = torch.ones([batch_size, 1, total_len, total_len], dtype=torch.float32, device=device)
+        mask_4d[:, 0, start_regress:, start_regress:] = attention_mask_4d[:, 0, :, :]
+
+        # Convert to additive mask format (1 → 0.0, 0 → -inf)
+        mask_4d = 1.0 - mask_4d
+        mask_4d = mask_4d.masked_fill(mask_4d > 0.5, torch.tensor(torch.finfo(mask_4d.dtype).min))
+        mask_4d = torch.ones([batch_size, total_len], dtype=torch.float32, device=device)
+
+        # Position IDs for registers
+        position_ids = torch.cat([
+            torch.arange(start_regress, device=device).unsqueeze(0).repeat(batch_size, 1), 
+            to_regress_position_ids + start_regress
+        ], dim=1)
+
+        # calulate loss
+        with self.maybe_autocast():
+            outputs = self.llama_model(
+                inputs_embeds=inputs_embeds,
+                attention_mask=mask_4d,
+                position_ids=position_ids,
+                return_dict=True,
+                labels=targets,
+            )
+            loss = outputs.loss
+
+        if verbose:
+            nvocab = self.llama_model.config.vocab_size
+            results = outputs.logits[:, empty_targets.size(1) - 1: -1, :].contiguous().view(-1, nvocab).argmax(dim=-1)
+            labels = targets[:, empty_targets.size(1):].contiguous().view(-1)
+            mask = (labels != -100)
+            correct = (results[mask] == labels[mask]).float().sum()
+            total = len(labels[mask])
+
+        if verbose:
+            return {"loss": loss, "correct": correct, "total": total}
+
+        return {"loss": loss}

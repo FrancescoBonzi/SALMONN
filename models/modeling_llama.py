@@ -452,10 +452,14 @@ class LlamaModel(LlamaPreTrainedModel):
             )
 
         if attention_mask is not None:
-            # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
-            expanded_attn_mask = _expand_mask(attention_mask, inputs_embeds.dtype, tgt_len=input_shape[-1]).to(
-                inputs_embeds.device
-            )
+            if attention_mask.dim() == 4:
+                # Already 4D: [bsz, 1, tgt_seq_len, src_seq_len] - use directly
+                expanded_attn_mask = attention_mask.to(dtype=inputs_embeds.dtype, device=inputs_embeds.device)
+            else:
+                # 2D: [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+                expanded_attn_mask = _expand_mask(attention_mask, inputs_embeds.dtype, tgt_len=input_shape[-1]).to(
+                    inputs_embeds.device
+                )
             combined_attention_mask = (
                 expanded_attn_mask if combined_attention_mask is None else expanded_attn_mask + combined_attention_mask
             )
