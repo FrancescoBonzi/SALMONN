@@ -694,31 +694,31 @@ class MutorSALMONN(SALMONN):
             )
             logits = outputs.logits
         
-        # Prefix length (bos + speech) - register/real indices are relative to after this
-        prefix_len = bos_embeds.shape[1] + speech_embeds.shape[1]
-        vocab_size = logits.shape[-1]
-        seq_len = targets.shape[1]
-        
-        flat_logits = logits[:, prefix_len:, :].reshape(-1, vocab_size)
-        flat_targets = targets.view(-1)
+            # Prefix length (bos + speech) - register/real indices are relative to after this
+            prefix_len = bos_embeds.shape[1] + speech_embeds.shape[1]
+            vocab_size = logits.shape[-1]
+            seq_len = targets.shape[1]
+            
+            flat_logits = logits[:, prefix_len:, :].reshape(-1, vocab_size)
+            flat_targets = targets.view(-1)
 
-        # Add batch offsets to convert per-sample indices to flat indices
-        batch_offsets = torch.arange(batch_size, device=device).unsqueeze(1) * seq_len
-        flat_real_indices = (real_token_indices_batch + batch_offsets).view(-1)
-        flat_reg_indices = (reg_token_indices_batch + batch_offsets).view(-1)
+            # Add batch offsets to convert per-sample indices to flat indices
+            batch_offsets = torch.arange(batch_size, device=device).unsqueeze(1) * seq_len
+            flat_real_indices = (real_token_indices_batch + batch_offsets).view(-1)
+            flat_reg_indices = (reg_token_indices_batch + batch_offsets).view(-1)
 
-        # Get logits and targets for real and register tokens
-        real_logits = flat_logits[flat_real_indices]
-        reg_logits = flat_logits[flat_reg_indices]
-        real_targets = flat_targets[flat_real_indices]
-        reg_targets = flat_targets[flat_reg_indices]
+            # Get logits and targets for real and register tokens
+            real_logits = flat_logits[flat_real_indices]
+            reg_logits = flat_logits[flat_reg_indices]
+            real_targets = flat_targets[flat_real_indices]
+            reg_targets = flat_targets[flat_reg_indices]
 
-        # Compute loss for NTP and register tokens
-        loss_ntp = F.cross_entropy(real_logits, real_targets)
-        loss_reg = F.cross_entropy(reg_logits, reg_targets)
+            # Compute loss for NTP and register tokens
+            loss_ntp = F.cross_entropy(real_logits, real_targets)
+            loss_reg = F.cross_entropy(reg_logits, reg_targets)
 
-        # Combined loss (can be weighted if needed)
-        loss = (1 - self.alpha) * loss_ntp + self.alpha * loss_reg
+            # Combined loss (can be weighted if needed)
+            loss = (1 - self.alpha) * loss_ntp + self.alpha * loss_reg
 
         if verbose:
             results = flat_logits.argmax(dim=-1)
