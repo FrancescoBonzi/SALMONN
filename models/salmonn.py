@@ -523,6 +523,81 @@ class MutorSALMONN(SALMONN):
         self.llama_tokenizer.register_token_id = self.llama_tokenizer.convert_tokens_to_ids("<reg>")
         self.llama_model.resize_token_embeddings(len(self.llama_tokenizer))
     
+    @classmethod
+    def from_config(cls, config):
+        # Get MuToR-specific params
+        min_offset = config.get("mutor_min_offset", 1)
+        max_offset = config.get("mutor_max_offset", 2)
+        alpha = config.get("mutor_alpha", 0.1)
+        
+        # Get all base SALMONN params
+        llama_path = config.get("llama_path")
+        whisper_path = config.get("whisper_path")
+        freeze_whisper = config.get("freeze_whisper", True)
+        beats_path = config.get("beats_path", "")
+        freeze_beats = config.get("freeze_beats", True)
+
+        use_speech_Qformer = config.get("use_speech_Qformer", True)
+        num_speech_query_token = config.get("num_speech_query_token", 1)
+        freeze_speech_QFormer = config.get("freeze_speech_QFormer", False)
+        window_level_Qformer = config.get("window_level_Qformer", True)
+        second_per_window = config.get("second_per_window", 0.333333)
+        second_stride = config.get("second_stride", 0.333333)
+
+        speech_llama_proj_model = config.get("speech_llama_proj_model", "")
+        freeze_speech_llama_proj = config.get("freeze_speech_llama_proj", False)
+
+        lora = config.get("lora", True)
+        lora_rank = config.get("lora_rank", 8)
+        lora_alpha = config.get("lora_alpha", 32)
+        lora_dropout = config.get("lora_dropout", 0.1)
+
+        multi_prompt = config.get("multi_prompt", False)
+        prompt_path = config.get("prompt_path", "")
+        prompt_template = config.get("prompt_template", "")
+        max_txt_len = config.get("max_txt_len", 128)
+        end_sym = config.get("end_sym", "</s>")
+        low_resource = config.get("low_resource", False)
+        device_8bit = config.get("device_8bit", 0)
+
+        model = cls(
+            min_offset=min_offset,
+            max_offset=max_offset,
+            alpha=alpha,
+            llama_path=llama_path,
+            whisper_path=whisper_path,
+            freeze_whisper=freeze_whisper,
+            beats_path=beats_path,
+            freeze_beats=freeze_beats,
+            use_speech_Qformer=use_speech_Qformer,
+            num_speech_query_token=num_speech_query_token,
+            freeze_speech_QFormer=freeze_speech_QFormer,
+            window_level_Qformer=window_level_Qformer,
+            second_per_window=second_per_window,
+            second_stride=second_stride,
+            speech_llama_proj_model=speech_llama_proj_model,
+            freeze_speech_llama_proj=freeze_speech_llama_proj,
+            lora=lora,
+            lora_rank=lora_rank,
+            lora_alpha=lora_alpha,
+            lora_dropout=lora_dropout,
+            multi_prompt=multi_prompt,
+            prompt_path=prompt_path,
+            prompt_template=prompt_template,
+            max_txt_len=max_txt_len,
+            end_sym=end_sym,
+            low_resource=low_resource,
+            device_8bit=device_8bit,
+        )
+
+        ckpt_path = config.get("ckpt", "")
+        if ckpt_path:
+            logging.info("Load MutorSALMONN ckpt from: {}".format(ckpt_path))
+            ckpt = torch.load(ckpt_path, map_location="cpu")
+            model.load_state_dict(ckpt['model'], strict=False)
+
+        return model
+    
     def forward(self, samples, verbose=False):
         if not self.training:
             return super().forward(samples, verbose)

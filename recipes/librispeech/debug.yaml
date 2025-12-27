@@ -3,6 +3,11 @@
 
 model:
   model_type: "mutor"
+  
+  # MuToR hyperparameters
+  mutor_min_offset: 1
+  mutor_max_offset: 2
+  mutor_alpha: 0.1
 
   # Mock LLaMA for CPU debugging (~19M params)
   llama_path: "pretrained/mock-llama"
