@@ -112,21 +112,18 @@ class SALMONN(nn.Module):
         self.llama_tokenizer.padding_side = "right"
 
         logging.info('Loading LLaMA Model')
-        # Use float16 on GPU for efficiency, float32 on CPU for stability
-        model_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
         if self.low_resource:
             self.llama_model = LlamaForCausalLM.from_pretrained(
                 llama_path,
-                torch_dtype=model_dtype,
+                torch_dtype=torch.float16,
                 load_in_8bit=True,
                 device_map={"": device_8bit},
             )
         else:
             self.llama_model = LlamaForCausalLM.from_pretrained(
                 llama_path,
-                torch_dtype=model_dtype,
+                torch_dtype=torch.float16,
             )
-        logging.info(f'Model dtype: {model_dtype}')
 
         self.llama_model.resize_token_embeddings(len(self.llama_tokenizer))
         for name, param in self.llama_model.named_parameters():
