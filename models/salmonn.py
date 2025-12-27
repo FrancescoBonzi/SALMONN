@@ -511,10 +511,11 @@ class SALMONN(nn.Module):
 
 
 class MutorSALMONN(SALMONN):
-    def __init__(self, min_offset=1, max_offset=4, *args, **kwargs):
+    def __init__(self, min_offset=1, max_offset=2, alpha=0.1, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.min_offset = min_offset
         self.max_offset = max_offset
+        self.alpha = alpha
 
         # Add register token to the tokenizer
         self.llama_tokenizer.add_special_tokens({"additional_special_tokens": ["<reg>"]})
@@ -682,35 +683,65 @@ class MutorSALMONN(SALMONN):
             to_regress_position_ids + start_regress
         ], dim=1)
 
-        empty_targets = (
-            torch.ones(
-                [speech_atts.shape[0], speech_atts.shape[1] + 1],
-                dtype=torch.long,
-                device=device,
-            ).fill_(-100)
-        )
-        targets = torch.cat([empty_targets, targets], dim=1)
-
-        # calulate loss
+        # Calculate loss with separate NTP and register losses
         with self.maybe_autocast():
             outputs = self.llama_model(
                 inputs_embeds=inputs_embeds,
                 attention_mask=mask_4d,
                 position_ids=position_ids,
                 return_dict=True,
-                labels=targets,
+                labels=None,
             )
-            loss = outputs.loss
+            logits = outputs.logits
+        
+        # Prefix length (bos + speech) - register/real indices are relative to after this
+        prefix_len = bos_embeds.shape[1] + speech_embeds.shape[1]
+        vocab_size = logits.shape[-1]
+        seq_len = targets.shape[1]
+        
+        flat_logits = logits[:, prefix_len:, :].reshape(-1, vocab_size)
+        flat_targets = targets.view(-1)
+
+        # Add batch offsets to convert per-sample indices to flat indices
+        batch_offsets = torch.arange(batch_size, device=device).unsqueeze(1) * seq_len
+        flat_real_indices = (real_token_indices_batch + batch_offsets).view(-1)
+        flat_reg_indices = (reg_token_indices_batch + batch_offsets).view(-1)
+
+        # Get logits and targets for real and register tokens
+        real_logits = flat_logits[flat_real_indices]
+        reg_logits = flat_logits[flat_reg_indices]
+        real_targets = flat_targets[flat_real_indices]
+        reg_targets = flat_targets[flat_reg_indices]
+
+        # Compute loss for NTP and register tokens
+        loss_ntp = F.cross_entropy(real_logits, real_targets)
+        loss_reg = F.cross_entropy(reg_logits, reg_targets)
+
+        # Combined loss (can be weighted if needed)
+        loss = (1 - self.alpha) * loss_ntp + self.alpha * loss_reg
 
         if verbose:
-            nvocab = self.llama_model.config.vocab_size
-            results = outputs.logits[:, empty_targets.size(1) - 1: -1, :].contiguous().view(-1, nvocab).argmax(dim=-1)
-            labels = targets[:, empty_targets.size(1):].contiguous().view(-1)
-            mask = (labels != -100)
-            correct = (results[mask] == labels[mask]).float().sum()
-            total = len(labels[mask])
+            results = flat_logits.argmax(dim=-1)
+            correct = (results == flat_targets).float().sum()
+            total = flat_targets.shape[0]
+
+            # Also compute separate accuracy for NTP and register
+            ntp_correct = (results[flat_real_indices] == real_targets).float().sum()
+            ntp_total = flat_real_indices.shape[0]
+            reg_correct = (results[flat_reg_indices] == reg_targets).float().sum()
+            reg_total = flat_reg_indices.shape[0]
 
         if verbose:
-            return {"loss": loss, "correct": correct, "total": total}
+            return {
+                "loss": loss,
+                "loss_ntp": loss_ntp,
+                "loss_reg": loss_reg,
+                "ntp_correct": ntp_correct,
+                "ntp_total": ntp_total,
+                "reg_correct": reg_correct,
+                "reg_total": reg_total,
+                "correct": correct,
+                "total": total,
+            }
 
-        return {"loss": loss}
+        return {"loss": loss, "loss_ntp": loss_ntp, "loss_reg": loss_reg}

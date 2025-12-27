@@ -101,6 +101,8 @@ class Runner:
         metric_logger = MetricLogger(delimiter="  ")
         metric_logger.add_meter("lr", SmoothedValue(window_size=1, fmt="{value:.6f}"))
         metric_logger.add_meter("loss", SmoothedValue(window_size=1, fmt="{value:.4f}"))
+        metric_logger.add_meter("loss_ntp", SmoothedValue(window_size=1, fmt="{value:.4f}"))
+        metric_logger.add_meter("loss_reg", SmoothedValue(window_size=1, fmt="{value:.4f}"))
 
         logging.info(
             "Start training epoch {}, {} iters per inner epoch.".format(
@@ -119,7 +121,10 @@ class Runner:
             self.scheduler.step(cur_epoch=epoch, cur_step=i)
 
             with torch.cuda.amp.autocast(enabled=self.use_amp):
-                loss = self.model(samples)["loss"]
+                outputs = self.model(samples)
+                loss = outputs["loss"]
+                loss_ntp = outputs.get("loss_ntp", loss)
+                loss_reg = outputs.get("loss_reg", torch.tensor(0.0))
 
             if self.use_amp:
                 self.scaler.scale(loss).backward()
@@ -135,6 +140,8 @@ class Runner:
                 self.optimizer.zero_grad()
 
             metric_logger.update(loss=loss.item())
+            metric_logger.update(loss_ntp=loss_ntp.item() if hasattr(loss_ntp, 'item') else loss_ntp)
+            metric_logger.update(loss_reg=loss_reg.item() if hasattr(loss_reg, 'item') else loss_reg)
             metric_logger.update(lr=self.optimizer.param_groups[0]["lr"])
 
         metric_logger.synchronize_between_processes()
@@ -164,11 +171,24 @@ class Runner:
             loss = forward_result.get("loss", 0)
             correct = forward_result.get("correct", 0)
             total = forward_result.get("total", 1)
+            
+            # Get separate losses if available (MutorSALMONN)
+            loss_ntp = forward_result.get("loss_ntp", loss)
+            loss_reg = forward_result.get("loss_reg", 0)
+            ntp_correct = forward_result.get("ntp_correct", correct)
+            ntp_total = forward_result.get("ntp_total", total)
+            reg_correct = forward_result.get("reg_correct", 0)
+            reg_total = forward_result.get("reg_total", 0)
+            
             res = {
                 "id": samples["id"],
                 "ground_truth": samples["text"],
-                "loss": loss.item(),
-                "acc": (correct / total).item(),
+                "loss": loss.item() if hasattr(loss, 'item') else loss,
+                "loss_ntp": loss_ntp.item() if hasattr(loss_ntp, 'item') else loss_ntp,
+                "loss_reg": loss_reg.item() if hasattr(loss_reg, 'item') else loss_reg,
+                "acc": (correct / total).item() if hasattr(correct, 'item') else (correct / total if total > 0 else 0),
+                "ntp_acc": (ntp_correct / ntp_total).item() if hasattr(ntp_correct, 'item') and ntp_total > 0 else (ntp_correct / ntp_total if ntp_total > 0 else 0),
+                "reg_acc": (reg_correct / reg_total).item() if hasattr(reg_correct, 'item') and reg_total > 0 else (reg_correct / reg_total if reg_total > 0 else 0),
                 "total": total,
             }
 
