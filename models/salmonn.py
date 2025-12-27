@@ -112,18 +112,21 @@ class SALMONN(nn.Module):
         self.llama_tokenizer.padding_side = "right"
 
         logging.info('Loading LLaMA Model')
+        # Use float16 on GPU for efficiency, float32 on CPU for stability
+        model_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
         if self.low_resource:
             self.llama_model = LlamaForCausalLM.from_pretrained(
                 llama_path,
-                torch_dtype=torch.float16,
+                torch_dtype=model_dtype,
                 load_in_8bit=True,
                 device_map={"": device_8bit},
             )
         else:
             self.llama_model = LlamaForCausalLM.from_pretrained(
                 llama_path,
-                torch_dtype=torch.float16,
+                torch_dtype=model_dtype,
             )
+        logging.info(f'Model dtype: {model_dtype}')
 
         self.llama_model.resize_token_embeddings(len(self.llama_tokenizer))
         for name, param in self.llama_model.named_parameters():
@@ -593,7 +596,7 @@ class MutorSALMONN(SALMONN):
             real_token_indices = all_indices[real_token_mask]
 
             # Create custom attention for the interleaved sequences
-            mask_auxiliary = torch.ones([double_sequence_len, double_sequence_len], dtype=torch.float32, device=device)
+            mask_auxiliary = torch.ones([double_sequence_len, double_sequence_len], dtype=speech_embeds.dtype, device=device)
             mask_auxiliary = torch.tril(mask_auxiliary, diagonal=-1) * double_attention_mask.unsqueeze(1)
 
             # Register tokens cannot attend to other register tokens
@@ -649,16 +652,7 @@ class MutorSALMONN(SALMONN):
             # Update position IDs for registers
             to_regress_position_ids[i, reg_token_indices_batch[i]] = reg_position_ids_batch[i]
 
-        empty_targets = (
-            torch.ones(
-                [speech_atts.shape[0], speech_atts.shape[1] + 1],
-                dtype=torch.long,
-                device=device,
-            ).fill_(-100)
-        )
-        targets = torch.cat([empty_targets, targets], dim=1)
-
-        ### Construct inputs for LLM ###
+        ### Construct inputs + targets for LLM ###
 
         bos = torch.ones(
             [batch_size, 1],
@@ -675,19 +669,27 @@ class MutorSALMONN(SALMONN):
         start_regress = bos_embeds.shape[1] + speech_embeds.shape[1]
 
         # Create base 4D mask with 1s (attend) - will use causal masking from LLaMA
-        mask_4d = torch.ones([batch_size, 1, total_len, total_len], dtype=torch.float32, device=device)
+        mask_4d = torch.ones([batch_size, 1, total_len, total_len], dtype=speech_embeds.dtype, device=device)
         mask_4d[:, 0, start_regress:, start_regress:] = attention_mask_4d[:, 0, :, :]
 
         # Convert to additive mask format (1 → 0.0, 0 → -inf)
         mask_4d = 1.0 - mask_4d
         mask_4d = mask_4d.masked_fill(mask_4d > 0.5, torch.tensor(torch.finfo(mask_4d.dtype).min))
-        mask_4d = torch.ones([batch_size, total_len], dtype=torch.float32, device=device)
 
         # Position IDs for registers
         position_ids = torch.cat([
             torch.arange(start_regress, device=device).unsqueeze(0).repeat(batch_size, 1), 
             to_regress_position_ids + start_regress
         ], dim=1)
+
+        empty_targets = (
+            torch.ones(
+                [speech_atts.shape[0], speech_atts.shape[1] + 1],
+                dtype=torch.long,
+                device=device,
+            ).fill_(-100)
+        )
+        targets = torch.cat([empty_targets, targets], dim=1)
 
         # calulate loss
         with self.maybe_autocast():
