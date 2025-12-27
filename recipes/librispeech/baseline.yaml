@@ -1,6 +1,8 @@
 # LibriSpeech ASR Training Config for SALMONN
 
 model:
+  model_type: "mutor"
+
   # Model paths (download with: python recipes/download_pretrained.sh)
   llama_path: "pretrained/vicuna-13b-v1.1"
   whisper_path: "pretrained/whisper-large-v2"
@@ -44,7 +46,7 @@ datasets:
 
 run:
   seed: 42
-  output_dir: "outputs/librispeech_asr"
+  output_dir: "outputs/librispeech_asr/mutor"
   evaluate: False
 
   log_freq: 10

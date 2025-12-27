@@ -2,6 +2,8 @@
 # Uses lightweight models for fast iteration and debugging
 
 model:
+  model_type: "mutor"
+
   # Mock LLaMA for CPU debugging (~19M params)
   llama_path: "pretrained/mock-llama"
   whisper_path: "pretrained/whisper-tiny"
@@ -45,7 +47,7 @@ datasets:
 
 run:
   seed: 42
-  output_dir: "outputs/librispeech_debug"
+  output_dir: "outputs/librispeech_debug/mutor"
   evaluate: False
 
   log_freq: 1
