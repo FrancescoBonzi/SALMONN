@@ -52,9 +52,9 @@ class SALMONN(nn.Module):
     def device(self):
         return list(self.parameters())[0].device
 
-    def maybe_autocast(self, dtype=torch.float16):
+    def maybe_autocast(self, dtype=torch.bfloat16):
         # if on cpu, don't use autocast
-        # if on gpu, use autocast with dtype if provided, otherwise use torch.float16
+        # if on gpu, use autocast with dtype if provided, otherwise use torch.bfloat16
         enable_autocast = self.device != torch.device("cpu")
 
         if enable_autocast:
@@ -112,6 +112,9 @@ class SALMONN(nn.Module):
         self.llama_tokenizer.padding_side = "right"
 
         logging.info('Loading LLaMA Model')
+        # Use bfloat16 on GPU - same memory as fp16 but doesn't need GradScaler
+        # (larger dynamic range). float32 on CPU for compatibility.
+        model_dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float32
         if self.low_resource:
             self.llama_model = LlamaForCausalLM.from_pretrained(
                 llama_path,
@@ -122,8 +125,9 @@ class SALMONN(nn.Module):
         else:
             self.llama_model = LlamaForCausalLM.from_pretrained(
                 llama_path,
-                torch_dtype=torch.float16,
+                torch_dtype=model_dtype,
             )
+        logging.info(f'LLaMA dtype: {model_dtype}')
 
         self.llama_model.resize_token_embeddings(len(self.llama_tokenizer))
         for name, param in self.llama_model.named_parameters():

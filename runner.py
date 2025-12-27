@@ -67,12 +67,16 @@ class Runner:
         self.valid_loader = get_dataloader(datasets["valid"], self.config.config.run, is_train=False, use_distributed=self.use_distributed)
         self.test_loader = get_dataloader(datasets["test"], self.config.config.run, is_train=False, use_distributed=self.use_distributed)
 
-        # scaler
+        # scaler - only use GradScaler for float16, not needed for bfloat16
         self.use_amp = self.config.config.run.get("amp", False)
-        if self.use_amp:
+        # Check if model uses bfloat16 (doesn't need gradient scaling)
+        model_uses_bf16 = any(p.dtype == torch.bfloat16 for p in self.model.parameters())
+        if self.use_amp and not model_uses_bf16:
             self.scaler = torch.cuda.amp.GradScaler()
         else:
             self.scaler = None
+        if model_uses_bf16:
+            logging.info("Using bfloat16 - GradScaler disabled (not needed)")
 
         # optimizer & scheduler
         self.iters_per_epoch = len(self.train_loader) if self.config.config.run.epoch_based else self.config.config.run.iters_per_epoch
@@ -120,19 +124,19 @@ class Runner:
 
             self.scheduler.step(cur_epoch=epoch, cur_step=i)
 
-            with torch.cuda.amp.autocast(enabled=self.use_amp):
+            with torch.cuda.amp.autocast(enabled=self.use_amp, dtype=torch.bfloat16):
                 outputs = self.model(samples)
                 loss = outputs["loss"]
                 loss_ntp = outputs.get("loss_ntp", loss)
                 loss_reg = outputs.get("loss_reg", torch.tensor(0.0))
 
-            if self.use_amp:
+            if self.scaler is not None:
                 self.scaler.scale(loss).backward()
             else:
                 loss.backward()
 
             if (i + 1) % self.config.config.run.accum_grad_iters == 0:
-                if self.use_amp:
+                if self.scaler is not None:
                     self.scaler.step(self.optimizer)
                     self.scaler.update()
                 else:
@@ -166,7 +170,7 @@ class Runner:
         for samples in metric_logger.log_every(dataloader, self.config.config.run.log_freq, header=header):
             samples = prepare_sample(samples, cuda_enabled=self.cuda_enabled)
 
-            with torch.cuda.amp.autocast(enabled=self.use_amp):
+            with torch.cuda.amp.autocast(enabled=self.use_amp, dtype=torch.bfloat16):
                 forward_result = model(samples, verbose=True)
             loss = forward_result.get("loss", 0)
             correct = forward_result.get("correct", 0)
