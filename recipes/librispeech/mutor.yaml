@@ -1,7 +1,12 @@
 # LibriSpeech ASR Training Config for SALMONN
 
 model:
-  model_type: "salmonn"
+  model_type: "mutor"
+
+  # MuToR hyperparameters
+  mutor_min_offset: 1
+  mutor_max_offset: 2
+  mutor_alpha: 0.1
 
   # Model paths (download with: python recipes/download_pretrained.sh)
   llama_path: "pretrained/vicuna-13b-v1.1"
@@ -46,7 +51,7 @@ datasets:
 
 run:
   seed: 42
-  output_dir: "outputs/librispeech_asr/salmonn"
+  output_dir: "outputs/librispeech_asr/mutor"
   evaluate: False
 
   log_freq: 10

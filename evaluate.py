@@ -11,7 +11,7 @@ from jiwer import wer, cer
 from omegaconf import OmegaConf
 
 from config import Config
-from models.salmonn import SALMONN
+from models.salmonn import SALMONN, MutorSALMONN
 from dataset import SALMONNDataset
 
 
@@ -64,7 +64,14 @@ def main():
     # Set checkpoint path in config so from_config loads it automatically
     cfg.config.model.ckpt = args.ckpt
     
-    model = SALMONN.from_config(cfg.config.model)
+    # Use appropriate model class based on model_type
+    model_type = cfg.config.model.get("model_type", "salmonn")
+    if model_type == "mutor":
+        print("Loading MutorSALMONN model...")
+        model = MutorSALMONN.from_config(cfg.config.model)
+    else:
+        print("Loading SALMONN model...")
+        model = SALMONN.from_config(cfg.config.model)
     model.to(args.device)
     model.eval()
     
