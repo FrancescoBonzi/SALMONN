@@ -14,6 +14,8 @@ seeds=(42)
 # Get the seed for this job array index
 seed=${seeds[$SLURM_ARRAY_TASK_ID]}
 
+model_type="salmonn"
+
 # Copy data to SLURM_TMPDIR for fast I/O
 echo "Copying data to SLURM_TMPDIR..."
 
@@ -55,7 +57,7 @@ source .venv/bin/activate
 echo "Starting evaluation..."
 
 # Find the output directory
-OUTPUT_DIR=$(ls -dt outputs/librispeech_asr/* | head -n 1)
+OUTPUT_DIR=$(ls -dt outputs/librispeech_asr/$model_type/$seed/* | head -n 1)
 BEST_CKPT="${OUTPUT_DIR}/checkpoint_best.pth"
 EVAL_OUTPUT="${OUTPUT_DIR}/eval_results"
 

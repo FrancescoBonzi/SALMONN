@@ -6,13 +6,15 @@
 #SBATCH --ntasks=1
 #SBATCH --gpus-per-node=h100:4
 #SBATCH --nodes=1
-#SBATCH --array=0-0
+#SBATCH --array=0-4
 
 # Define seeds array
-seeds=(42)
+seeds=(1 2 3 4 5)
 
 # Get the seed for this job array index
 seed=${seeds[$SLURM_ARRAY_TASK_ID]}
+
+model_type="salmonn"
 
 # Copy data to SLURM_TMPDIR for fast I/O
 echo "Copying data to SLURM_TMPDIR..."
@@ -54,7 +56,7 @@ source .venv/bin/activate
 # Run training
 echo "Starting training..."
 
-torchrun --nproc_per_node=4 train.py --cfg-path recipes/librispeech/baseline.yaml \
+torchrun --nproc_per_node=4 train.py --cfg-path recipes/librispeech/$model_type.yaml \
     --options \
     model.llama_path="$SLURM_TMPDIR/pretrained/vicuna-13b-v1.1" \
     model.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
@@ -64,6 +66,7 @@ torchrun --nproc_per_node=4 train.py --cfg-path recipes/librispeech/baseline.yam
     datasets.test_ann_path="$SLURM_TMPDIR/data/librispeech/test_librispeech.json" \
     datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
     run.seed="$seed" \
+    run.output_dir="outputs/librispeech_asr/$model_type/$seed" \
     run.num_workers="$SLURM_CPUS_PER_TASK"
 
 echo "Training finished at $(date)"
@@ -72,7 +75,7 @@ echo "Training finished at $(date)"
 echo "Starting evaluation..."
 
 # Find the output directory
-OUTPUT_DIR=$(ls -dt outputs/librispeech_asr/* | head -n 1)
+OUTPUT_DIR=$(ls -dt outputs/librispeech_asr/$model_type/$seed/* | head -n 1)
 BEST_CKPT="${OUTPUT_DIR}/checkpoint_best.pth"
 EVAL_OUTPUT="${OUTPUT_DIR}/eval_results"
 
@@ -82,7 +85,7 @@ echo "Saving evaluation results to: $EVAL_OUTPUT"
 mkdir -p "$EVAL_OUTPUT"
 
 python evaluate.py \
-    --cfg-path recipes/librispeech/baseline.yaml \
+    --cfg-path recipes/librispeech/$model_type.yaml \
     --ckpt "$BEST_CKPT" \
     --split test \
     --batch-size 8 \
