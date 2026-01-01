@@ -48,6 +48,7 @@ run:
   seed: 42
   output_dir: "outputs/librispeech_asr/salmonn"
   evaluate: False
+  save_only_best: True
 
   log_freq: 10
   epoch_based: False

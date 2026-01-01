@@ -315,7 +315,8 @@ class Runner:
                     valid_log.update({"best_epoch": best_epoch})
                     self.log_stats(valid_log, split_name="valid")
 
-            self.save_checkpoint(cur_epoch, is_best=False)
+            if not self.config.config.run.get("save_only_best", False):
+                self.save_checkpoint(cur_epoch, is_best=False)
 
             if self.use_distributed:
                 dist.barrier()

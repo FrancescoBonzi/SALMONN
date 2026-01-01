@@ -54,6 +54,7 @@ run:
   seed: 42
   output_dir: "outputs/librispeech_debug/mutor"
   evaluate: False
+  save_only_best: True
 
   log_freq: 1
   epoch_based: False
