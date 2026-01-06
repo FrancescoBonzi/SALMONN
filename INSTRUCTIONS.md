@@ -3,7 +3,7 @@
 Download the code and install packages (optional: create env)
 ```
 git clone https://github.com/FrancescoBonzi/SALMONN
-git checkout recipe/librispeech
+git checkout feature/mutor
 cd SALMONN
 pip install -r requirements.txt
 ```
