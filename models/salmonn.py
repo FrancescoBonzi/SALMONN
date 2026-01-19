@@ -334,6 +334,13 @@ class SALMONN(nn.Module):
             else:
                 prompt = random.choice(self.prompt_dict[samples["task"][0]])
 
+            # For reasoning tasks, concatenate question + prompt
+            if "question" in samples and any(samples["question"]):
+                if not self.multi_prompt:
+                    prompt = [prompt] * len(samples["question"])
+                    self.multi_prompt = True
+                prompt = [q + " " + p for p, q in zip(prompt, samples["question"])]
+
         # use speech/audio encoder to encode speech/audio
         spectrogram = samples["spectrogram"]
         raw_wav = samples.get("raw_wav", None)
@@ -341,12 +348,15 @@ class SALMONN(nn.Module):
 
         speech_embeds, speech_atts = self.encode_speech(spectrogram, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask)
 
-        # wrap speech_embeds with prompts
+        # wrap speech_embeds with prompts (includes question for reasoning tasks)
         if self.prompt_dict:
             speech_embeds, speech_atts = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt)
 
-        # prepare inputs for LLM
-        text = [t + self.end_sym for t in samples["text"]]
+        # prepare inputs for LLM (use answer for reasoning tasks, text for ASR)
+        if "answer" in samples and any(samples["answer"]):
+            text = [t + self.end_sym for t in samples["answer"]]
+        else:
+            text = [t + self.end_sym for t in samples["text"]]
         to_regress_tokens = self.llama_tokenizer(
             text,
             return_tensors="pt",
