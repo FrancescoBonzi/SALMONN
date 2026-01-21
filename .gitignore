@@ -170,3 +170,5 @@ arnold.sh
 .vscode/
 pretrained/
 outputs/
+
+data/SLLM-multi-hop*/
