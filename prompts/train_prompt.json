@@ -128,5 +128,19 @@
         "<Speech><SpeechHere></Speech> Identify each speaker in turn and what is said.",
         "<Speech><SpeechHere></Speech> Write down the content of each speaker and the corresponding speech in turn.",
         "<Speech><SpeechHere></Speech> Please recognize each speaker and transcribe their speech content."
+    ],
+    "mmar": [
+        "<Speech><SpeechHere></Speech> Listen to this music clip and answer the following question. {}",
+        "<Speech><SpeechHere></Speech> Based on the music you hear, please answer this question: {}",
+        "<Speech><SpeechHere></Speech> After listening to the music, select the correct answer. {}",
+        "<Speech><SpeechHere></Speech> Please analyze the music and answer this question: {}",
+        "<Speech><SpeechHere></Speech> Listen carefully to the music and respond to this question: {}",
+        "<Speech><SpeechHere></Speech> What is the answer to this music question? {}",
+        "<Speech><SpeechHere></Speech> Analyze the musical characteristics and answer: {}",
+        "<Speech><SpeechHere></Speech> Based on what you hear in the audio, answer the question: {}",
+        "<Speech><SpeechHere></Speech> Listen to the audio clip. {}",
+        "<Speech><SpeechHere></Speech> Please answer the following music understanding question: {}",
+        "<Speech><SpeechHere></Speech> After listening, choose the correct answer for this question: {}",
+        "<Speech><SpeechHere></Speech> Identify the correct response to this question based on the audio: {}"
     ]
 }
