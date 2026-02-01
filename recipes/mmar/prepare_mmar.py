@@ -24,7 +24,7 @@ def prepare_mmar_annotations(output_dir: str, download_dir: str = "./data"):
     print("\nDownloading audio archive (~698MB)...")
     audio_tar_path = hf_hub_download(
         repo_id="BoJack/MMAR",
-        filename="MMAR/mmar-audio.tar.gz",
+        filename="mmar-audio.tar.gz",
         repo_type="dataset",
         cache_dir=download_dir
     )
