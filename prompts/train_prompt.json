@@ -130,17 +130,17 @@
         "<Speech><SpeechHere></Speech> Please recognize each speaker and transcribe their speech content."
     ],
     "mmar": [
-        "<Speech><SpeechHere></Speech> Listen to this music clip and answer the following question. {}",
-        "<Speech><SpeechHere></Speech> Based on the music you hear, please answer this question: {}",
-        "<Speech><SpeechHere></Speech> After listening to the music, select the correct answer. {}",
-        "<Speech><SpeechHere></Speech> Please analyze the music and answer this question: {}",
-        "<Speech><SpeechHere></Speech> Listen carefully to the music and respond to this question: {}",
-        "<Speech><SpeechHere></Speech> What is the answer to this music question? {}",
-        "<Speech><SpeechHere></Speech> Analyze the musical characteristics and answer: {}",
-        "<Speech><SpeechHere></Speech> Based on what you hear in the audio, answer the question: {}",
-        "<Speech><SpeechHere></Speech> Listen to the audio clip. {}",
-        "<Speech><SpeechHere></Speech> Please answer the following music understanding question: {}",
-        "<Speech><SpeechHere></Speech> After listening, choose the correct answer for this question: {}",
-        "<Speech><SpeechHere></Speech> Identify the correct response to this question based on the audio: {}"
+        "<Speech><SpeechHere></Speech> Listen to this music clip and answer the following question. {} Respond with only the letter of the correct answer.",
+        "<Speech><SpeechHere></Speech> Based on the music you hear, please answer this question: {} Select the correct option.",
+        "<Speech><SpeechHere></Speech> After listening to the music, select the correct answer. {} Output only the letter.",
+        "<Speech><SpeechHere></Speech> Please analyze the music and answer this question: {} Choose the correct option.",
+        "<Speech><SpeechHere></Speech> Listen carefully to the music and respond to this question: {} Reply with just the letter of your choice.",
+        "<Speech><SpeechHere></Speech> What is the answer to this music question? {} Answer with only the letter.",
+        "<Speech><SpeechHere></Speech> Analyze the musical characteristics and answer: {} Provide only the letter of the correct answer.",
+        "<Speech><SpeechHere></Speech> Based on what you hear in the audio, answer the question: {} Respond with a single letter.",
+        "<Speech><SpeechHere></Speech> Listen to the audio clip. {} Choose the correct option and output only its letter.",
+        "<Speech><SpeechHere></Speech> Please answer the following music understanding question: {} Select the correct answer.",
+        "<Speech><SpeechHere></Speech> After listening, choose the correct answer for this question: {} Output the letter only.",
+        "<Speech><SpeechHere></Speech> Identify the correct response to this question based on the audio: {} Respond with just the letter."
     ]
 }
