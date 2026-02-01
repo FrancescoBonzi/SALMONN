@@ -1,9 +1,8 @@
 import os
 import json
 from pathlib import Path
-from datasets import load_dataset
-from huggingface_hub import hf_hub_download
-import shutil
+from datasets import load_dataset, Audio
+import soundfile as sf
 
 
 def prepare_mmar_annotations(output_dir: str, download_dir: str = "./data"):
@@ -20,12 +19,12 @@ def prepare_mmar_annotations(output_dir: str, download_dir: str = "./data"):
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(download_dir, exist_ok=True)
 
-    mmar_audio_dir = os.path.join(download_dir, "MMAR")
+    mmar_audio_dir = os.path.join(download_dir, "MMAR", "audio")
     os.makedirs(mmar_audio_dir, exist_ok=True)
 
     print("Loading MMAR dataset from HuggingFace...")
 
-    # Load the metadata
+    # Load the dataset with audio feature
     try:
         dataset = load_dataset("BoJack/MMAR", cache_dir=download_dir)
     except Exception as e:
@@ -38,32 +37,8 @@ def prepare_mmar_annotations(output_dir: str, download_dir: str = "./data"):
         print("Error: 'test' split not found in dataset")
         return
 
-    print("\nDownloading MMAR audio files...")
-    print("Note: This may take a while as audio files are ~698MB")
-
-    # Download the audio zip file from the HuggingFace repo
-    try:
-        # The audio files are stored in a separate repository structure
-        # We'll download them using hf_hub_download
-        audio_zip_path = hf_hub_download(
-            repo_id="BoJack/MMAR",
-            filename="audio.zip",
-            repo_type="dataset",
-            cache_dir=download_dir
-        )
-
-        # Extract audio files
-        import zipfile
-        print(f"Extracting audio files to {mmar_audio_dir}...")
-        with zipfile.ZipFile(audio_zip_path, 'r') as zip_ref:
-            zip_ref.extractall(mmar_audio_dir)
-        print("Audio extraction complete!")
-
-    except Exception as e:
-        print(f"Warning: Could not download audio.zip: {e}")
-        print("You may need to manually download audio files from:")
-        print("https://huggingface.co/datasets/BoJack/MMAR")
-        print("Continuing with metadata processing...")
+    print("\nExtracting and saving audio files...")
+    print("Note: This may take a while as audio files are being processed")
 
     # Process the test split
     test_data = dataset["test"]
@@ -80,11 +55,41 @@ def prepare_mmar_annotations(output_dir: str, download_dir: str = "./data"):
         # - answer: the correct answer text
         # - modality, category, sub-category, language, source, url, timestamp
 
-        # Get the audio path and convert it to absolute path
+        # Get the audio data and save it to disk
         audio_rel_path = sample.get("audio_path", "")
         # Remove the "./" prefix if present
         audio_rel_path = audio_rel_path.replace("./", "")
-        audio_path = os.path.join(mmar_audio_dir, audio_rel_path)
+
+        # Create the full path where we'll save the audio
+        audio_save_path = os.path.join(mmar_audio_dir, audio_rel_path)
+
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(audio_save_path), exist_ok=True)
+
+        # The audio is stored in the 'audio' column (if it exists)
+        # HuggingFace datasets may store audio in different ways
+        # Check if audio data is available
+        if 'audio' in sample:
+            try:
+                # Extract audio array and sampling rate
+                audio_data = sample['audio']
+                if isinstance(audio_data, dict) and 'array' in audio_data:
+                    # Save the audio file
+                    sf.write(
+                        audio_save_path,
+                        audio_data['array'],
+                        audio_data['sampling_rate']
+                    )
+                else:
+                    print(f"Warning: Unexpected audio format for sample {i}")
+            except Exception as e:
+                print(f"Warning: Could not save audio for sample {i}: {e}")
+                # Continue with just the path
+
+        # If audio file doesn't exist, note it but continue
+        if not os.path.exists(audio_save_path):
+            print(f"Warning: Audio file not found at {audio_save_path}")
+            # You may want to skip this sample or handle it differently
 
         # Format choices as a string
         choices = sample.get("choices", [])
@@ -122,7 +127,7 @@ def prepare_mmar_annotations(output_dir: str, download_dir: str = "./data"):
 
         # Annotation structure matching LibriSpeech format
         annotation = {
-            "path": audio_path,
+            "path": audio_save_path,
             "text": text,  # Combined question and choices
             "answer": str(answer_letter),  # The correct answer
             "task": "mmar",
@@ -179,7 +184,7 @@ def prepare_mmar_annotations(output_dir: str, download_dir: str = "./data"):
     print("- Prompts are loaded from prompts/train_prompt.json during training")
     print("- Make sure to update prompts/train_prompt.json with MMAR prompts")
     print("\nAudio file location:")
-    print(f"- Audio files should be in: {mmar_audio_dir}/audio/")
+    print(f"- Audio files saved to: {mmar_audio_dir}/")
 
 
 if __name__ == "__main__":
