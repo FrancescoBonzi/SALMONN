@@ -130,17 +130,10 @@
         "<Speech><SpeechHere></Speech> Please recognize each speaker and transcribe their speech content."
     ],
     "mmar": [
-        "<Speech><SpeechHere></Speech> Listen to this music clip and answer the following question. {} Respond with only the letter of the correct answer.",
-        "<Speech><SpeechHere></Speech> Based on the music you hear, please answer this question: {} Select the correct option.",
-        "<Speech><SpeechHere></Speech> After listening to the music, select the correct answer. {} Output only the letter.",
-        "<Speech><SpeechHere></Speech> Please analyze the music and answer this question: {} Choose the correct option.",
-        "<Speech><SpeechHere></Speech> Listen carefully to the music and respond to this question: {} Reply with just the letter of your choice.",
-        "<Speech><SpeechHere></Speech> What is the answer to this music question? {} Answer with only the letter.",
-        "<Speech><SpeechHere></Speech> Analyze the musical characteristics and answer: {} Provide only the letter of the correct answer.",
-        "<Speech><SpeechHere></Speech> Based on what you hear in the audio, answer the question: {} Respond with a single letter.",
-        "<Speech><SpeechHere></Speech> Listen to the audio clip. {} Choose the correct option and output only its letter.",
-        "<Speech><SpeechHere></Speech> Please answer the following music understanding question: {} Select the correct answer.",
-        "<Speech><SpeechHere></Speech> After listening, choose the correct answer for this question: {} Output the letter only.",
-        "<Speech><SpeechHere></Speech> Identify the correct response to this question based on the audio: {} Respond with just the letter."
+        "<Speech><SpeechHere></Speech>\n\nQuestion: {}\n\nSelect the correct option and respond with only its letter.\n\nAnswer:",
+        "<Speech><SpeechHere></Speech>\n\n{}\n\nChoose the correct answer and provide only the letter.\n\nAnswer:",
+        "<Speech><SpeechHere></Speech> Listen to the audio and answer the following question:\n\n{}\n\nProvide only the letter of the correct option.\n\nAnswer:",
+        "<Speech><SpeechHere></Speech>\n\nBased on the audio, answer this question:\n\n{}\n\nRespond with a single letter indicating your choice.\n\nAnswer:",
+        "<Speech><SpeechHere></Speech> Listen carefully.\n\nQuestion: {}\n\nOutput only the letter of your selected answer.\n\nAnswer:"
     ]
 }
