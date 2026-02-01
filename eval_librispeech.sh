@@ -25,7 +25,7 @@ cp -r "data/LibriSpeech" "$SLURM_TMPDIR/data/" &
 COPY_AUDIO_PID=$!
 
 # Copy annotation files
-cp -r "data/librispeech" "$SLURM_TMPDIR/data/" &
+cp -r "data/LibriSpeech/annotations" "$SLURM_TMPDIR/data/" &
 COPY_ANN_PID=$!
 
 # Copy pretrained models
@@ -67,7 +67,7 @@ echo "Saving evaluation results to: $EVAL_OUTPUT"
 mkdir -p "$EVAL_OUTPUT"
 
 python evaluate/evaluate.py \
-    --cfg-path recipes/librispeech/baseline.yaml \
+    --cfg-path recipes/librispeech/salmonn.yaml \
     --ckpt "$BEST_CKPT" \
     --split test \
     --batch-size 8 \
