@@ -17,5 +17,8 @@ wget -O BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt "https://huggingface.co/
 echo "Downloading Vicuna 13B v1.1..."
 hf download lmsys/vicuna-13b-v1.1 --local-dir vicuna-13b-v1.1
 
+# 4. SALMONN pretrained checkpoint
+echo "Downloading SALMONN pretrained checkpoint..."
+wget -O salmonn_v1.pth "https://huggingface.co/tsinghua-ee/SALMONN/resolve/main/salmonn_v1.pth?download=true"
 echo "Done!"
 

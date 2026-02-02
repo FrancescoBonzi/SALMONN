@@ -1,15 +1,15 @@
 #!/bin/bash
-#SBATCH --time=3:0:0
+#SBATCH --time=12:0:0
 #SBATCH --account=aip-csubakan
 #SBATCH --cpus-per-task=48
 #SBATCH --mem=488G
 #SBATCH --ntasks=1
 #SBATCH --gpus-per-node=h100:4
 #SBATCH --nodes=1
-#SBATCH --array=0-0
+#SBATCH --array=0-4
 
 # Define seeds array
-seeds=(42)
+seeds=(1 2 3 4 5)
 
 # Get the seed for this job array index
 seed=${seeds[$SLURM_ARRAY_TASK_ID]}
@@ -53,6 +53,24 @@ module load StdEnv/2023 cuda/12.2
 module load httpproxy
 source .venv/bin/activate
 
+# Run training
+echo "Starting training..."
+
+torchrun --nproc_per_node=4 train.py --cfg-path recipes/librispeech/$model_type.yaml \
+    --options \
+    model.llama_path="$SLURM_TMPDIR/pretrained/vicuna-13b-v1.1" \
+    model.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
+    model.beats_path="$SLURM_TMPDIR/pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" \
+    datasets.train_ann_path="$SLURM_TMPDIR/data/librispeech/train_librispeech.json" \
+    datasets.valid_ann_path="$SLURM_TMPDIR/data/librispeech/valid_librispeech.json" \
+    datasets.test_ann_path="$SLURM_TMPDIR/data/librispeech/test_librispeech.json" \
+    datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
+    run.seed="$seed" \
+    run.output_dir="outputs/librispeech_asr/$model_type/$seed" \
+    run.num_workers="$SLURM_CPUS_PER_TASK"
+
+echo "Training finished at $(date)"
+
 # Run evaluation on the best checkpoint
 echo "Starting evaluation..."
 
@@ -66,8 +84,8 @@ echo "Saving evaluation results to: $EVAL_OUTPUT"
 
 mkdir -p "$EVAL_OUTPUT"
 
-python evaluate.py \
-    --cfg-path recipes/librispeech/baseline.yaml \
+python evaluate/evaluate.py \
+    --cfg-path recipes/librispeech/$model_type.yaml \
     --ckpt "$BEST_CKPT" \
     --split test \
     --batch-size 8 \
