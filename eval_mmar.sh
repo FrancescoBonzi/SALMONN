@@ -39,8 +39,11 @@ COPY_VICUNA_PID=$!
 cp "pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" "$SLURM_TMPDIR/pretrained/" &
 COPY_BEATS_PID=$!
 
+cp "pretrained/salmonn_v1.pth" "$SLURM_TMPDIR/pretrained/" &
+COPY_SALMONN_PID=$!
+
 # Wait for all copies to finish
-wait $COPY_AUDIO_PID $COPY_ANN_PID $COPY_WHISPER_PID $COPY_VICUNA_PID $COPY_BEATS_PID
+wait $COPY_AUDIO_PID $COPY_ANN_PID $COPY_WHISPER_PID $COPY_VICUNA_PID $COPY_BEATS_PID $COPY_SALMONN_PID
 echo "Data copy complete!"
 
 # Update annotation paths to point to SLURM_TMPDIR
@@ -55,24 +58,16 @@ source .venv/bin/activate
 # Run evaluation on the best checkpoint
 echo "Starting evaluation..."
 
-# Find the output directory
-OUTPUT_DIR=$(ls -dt outputs/mmar/$model_type/$seed/* | head -n 1)
-BEST_CKPT="${OUTPUT_DIR}/checkpoint_best.pth"
-EVAL_OUTPUT="${OUTPUT_DIR}/eval_results"
+EVAL_DIR="outputs/mmar/salmonn/$seed/eval_results"
+mkdir -p "$EVAL_DIR"
 
-echo "Using checkpoint: $BEST_CKPT"
-echo "Saving evaluation results to: $EVAL_OUTPUT"
-
-mkdir -p "$EVAL_OUTPUT"
-
-python evaluate/evaluate_mmar.py \
+python evaluate_mmar.py \
     --cfg-path recipes/mmar/salmonn.yaml \
-    --ckpt "$BEST_CKPT" \
-    --split test \
+    --ckpt "$SLURM_TMPDIR/pretrained/salmonn_v1.pth" \
     --batch-size 8 \
     --num-workers "$SLURM_CPUS_PER_TASK" \
     --device cuda:0 \
-    --output-dir "$EVAL_OUTPUT" \
+    --output-dir "$EVAL_DIR" \
     --options \
     model.llama_path="$SLURM_TMPDIR/pretrained/vicuna-13b-v1.1" \
     model.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \

@@ -177,10 +177,7 @@ def main():
     
     # Load dataset
     data_config = cfg.config.datasets
-    if args.split == "test":
-        ann_path = data_config.test_ann_path
-    else:
-        ann_path = data_config.valid_ann_path
+    ann_path = data_config.test_ann_path
     
     print(f"Loading dataset from: {ann_path}")
     dataset = SALMONNDataset(ann_path, data_config.whisper_path)

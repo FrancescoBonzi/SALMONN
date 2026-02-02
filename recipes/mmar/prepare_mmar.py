@@ -6,7 +6,34 @@ from pathlib import Path
 import tarfile
 import urllib.request
 
+import soundfile as sf
+import librosa
 from datasets import load_dataset
+
+TARGET_SAMPLE_RATE = 16000  # Whisper expects 16 kHz
+AUDIO_EXTENSIONS = {".wav", ".flac", ".ogg"}
+
+
+def resample_audio_dir(root_dir: Path, target_sr: int = TARGET_SAMPLE_RATE):
+    """Resample all audio files under root_dir to target_sr (16 kHz for Whisper)."""
+    root_dir = Path(root_dir)
+    resampled = 0
+    for path in root_dir.rglob("*"):
+        if path.suffix.lower() not in AUDIO_EXTENSIONS or not path.is_file():
+            continue
+        try:
+            audio, sr = sf.read(path)
+            if sr == target_sr:
+                continue
+            if len(audio.shape) == 2:
+                audio = audio.mean(axis=1)
+            audio = librosa.resample(audio, orig_sr=sr, target_sr=target_sr)
+            sf.write(path, audio, target_sr)
+            resampled += 1
+        except Exception as e:
+            print(f"Warning: failed to resample {path}: {e}")
+    if resampled:
+        print(f"Resampled {resampled} audio file(s) to {target_sr} Hz.")
 
 
 def prepare_mmar_annotations(output_dir: str):
@@ -49,6 +76,9 @@ if __name__ == "__main__":
     print("Extracting...")
     with tarfile.open(archive_path, "r:gz") as tf:
         tf.extractall(data_dir)
+
+    print("Resampling audio to 16 kHz for Whisper...")
+    resample_audio_dir(data_dir)
 
     prepare_mmar_annotations(str(data_dir))
     print("Done. Dataset in", data_dir)
