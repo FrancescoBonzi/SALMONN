@@ -189,7 +189,13 @@ def main():
         collate_fn=dataset.collater,
         pin_memory=True,
     )
-    
+
+    metadata_list = json.load(open(ann_path, "r"))["annotation"]
+    metadata = {
+        item["id"]: {k: v for k, v in item.items() if k != "id"}
+        for item in metadata_list
+    }
+
     # Run inference
     print("Running inference...")
     results = []
@@ -204,16 +210,17 @@ def main():
             # Create prompts for batch
             prompts = []
             for i in range(args.batch_size):
-                question = batch["question"][i]
+                id = batch["id"][i]
+                question = metadata[id]["question"]
                 if not question.endswith("?") and not question.endswith("."):
-                    if question.startswith(("Which", "What", "Who", "When", "Where", "Why", "How")):
+                    if question.startswith(("Which", "What", "Who", "When", "Where", "Why", "How", "Are", "Is")):
                         question += "?"
                     else:
                         question += "."
                 choices = "\n".join([
                     f"({letter}) {choice}" 
                     for letter, choice in zip(
-                        string.ascii_uppercase[:len(batch["choices"][i])], batch["choices"][i]
+                        string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
                     )
                 ])
                 prompt = f"<Speech><SpeechHere></Speech> {question}\n{choices}\nAnswer with the text of the choice."
@@ -235,10 +242,10 @@ def main():
                     "id": uid,
                     "model_prediction": hyp_clean,
                     "answer": ref,
-                    "choices": batch["choices"][i],
-                    "modality": batch["modality"][i],
-                    "category": batch["category"][i],  
-                    "sub-category": batch["sub-category"][i] if batch["sub-category"][i] is not None else None,
+                    "choices": metadata[uid]["choices"],
+                    "modality": metadata[uid]["modality"],
+                    "category": metadata[uid]["category"],  
+                    "sub-category": metadata[uid]["sub-category"] if metadata[uid]["sub-category"] is not None else None,
                 })
 
     # Save results
