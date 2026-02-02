@@ -192,7 +192,7 @@ def main():
 
     metadata_list = json.load(open(ann_path, "r"))["annotation"]
     metadata = {
-        item["id"]: {k: v for k, v in item.items() if k != "id"}
+        item["path"]: {k: v for k, v in item.items() if k != "path"}
         for item in metadata_list
     }
 
@@ -247,6 +247,11 @@ def main():
                     "category": metadata[uid]["category"],  
                     "sub-category": metadata[uid]["sub-category"] if metadata[uid]["sub-category"] is not None else None,
                 })
+
+            # Free batch GPU tensors to avoid fragmentation and OOM over many iterations
+            del batch["spectrogram"], batch["raw_wav"], batch["padding_mask"]
+            if args.device.startswith("cuda"):
+                torch.cuda.empty_cache()
 
     # Save results
     with open(os.path.join(args.output_dir, "results.json"), "w") as f:
