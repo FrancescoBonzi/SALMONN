@@ -64,7 +64,7 @@ mkdir -p "$EVAL_DIR"
 python evaluate_mmar.py \
     --cfg-path recipes/mmar/salmonn.yaml \
     --ckpt "$SLURM_TMPDIR/pretrained/salmonn_v1.pth" \
-    --batch-size 8 \
+    --batch-size 4 \
     --num-workers "$SLURM_CPUS_PER_TASK" \
     --device cuda:0 \
     --output-dir "$EVAL_DIR" \
