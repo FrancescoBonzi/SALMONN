@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=3:0:0
+#SBATCH --time=1:0:0
 #SBATCH --account=aip-csubakan
 #SBATCH --cpus-per-task=48
 #SBATCH --mem=488G

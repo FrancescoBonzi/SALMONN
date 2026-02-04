@@ -223,7 +223,7 @@ def main():
                         string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
                     )
                 ])
-                prompt = f"<Speech><SpeechHere></Speech> {question}\n\nOptions:\n{choices}\n\nQuestion: Which option is correct? Answer with the content of the choice directly, do not mention the letter."
+                prompt = f"<Speech><SpeechHere></Speech> Select the correct option from the following choices and provide the answer. Your response should start with the option letter (e.g., '(A)') followed by the text of the option.\nQuestion: {question}\nOptions:\n{choices}"
                 prompts.append(cfg.config.model.prompt_template.format(prompt))
             
             # Generate transcriptions
