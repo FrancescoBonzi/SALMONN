@@ -242,9 +242,10 @@ def main():
                     "id": uid,
                     "model_prediction": hyp_clean,
                     "answer": ref,
+                    "prompt": prompts[i],
                     "choices": metadata[uid]["choices"],
                     "modality": metadata[uid]["modality"],
-                    "category": metadata[uid]["category"],  
+                    "category": metadata[uid]["category"],
                     "sub-category": metadata[uid]["sub-category"] if metadata[uid]["sub-category"] is not None else None,
                 })
 
