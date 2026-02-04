@@ -52,7 +52,8 @@ def prepare_cot_clotho_aqa_annotations(output_dir: str):
             "text": item["conversations"][1]["value"],
         })
 
-    ann_path = output_dir / "train_clotho_aqa.json"
+    ann_path = output_dir / "annotations" / "train_clotho_aqa.json"
+    os.makedirs(ann_path.parent, exist_ok=True)
     with open(ann_path, "w") as f:
         json.dump({"annotation": train_annotations}, f, indent=2)
     print(f"Saved {len(train_annotations)} samples to {ann_path}")
