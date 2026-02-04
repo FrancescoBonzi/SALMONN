@@ -209,7 +209,7 @@ def main():
 
             # Create prompts for batch
             prompts = []
-            for i in range(args.batch_size):
+            for i in range(len(batch["id"])):
                 id = batch["id"][i]
                 question = metadata[id]["question"]
                 if not question.endswith("?") and not question.endswith("."):
@@ -223,7 +223,7 @@ def main():
                         string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
                     )
                 ])
-                prompt = f"<Speech><SpeechHere></Speech> {question}\n{choices}\nAnswer with the text of the choice."
+                prompt = f"<Speech><SpeechHere></Speech> {question}\n\nOptions:\n{choices}\n\nQuestion: Which option is correct? Answer with the content of the choice directly, do not mention the letter."
                 prompts.append(cfg.config.model.prompt_template.format(prompt))
             
             # Generate transcriptions
