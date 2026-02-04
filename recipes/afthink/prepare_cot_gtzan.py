@@ -82,7 +82,7 @@ if __name__ == "__main__":
     # Move genres to audio_files/
     genres_src = data_dir / "MusicGenreRecogniton-master" / "genres"
     if genres_src.exists():
-        shutil.move(str(genres_src), str(audio_files_dir / "genres"))
+        shutil.move(str(genres_src), str(audio_files_dir))
 
     # Remove extracted directory
     extracted_dir = data_dir / "MusicGenreRecogniton-master"

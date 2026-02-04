@@ -47,7 +47,7 @@ if __name__ == "__main__":
 
     print("Extracting...")
     with tarfile.open(archive_path, "r") as tar:
-        tar.extractall()
+        tar.extractall(path=data_dir)
 
     # Rename chunks to audio_files
     chunks_src = data_dir / "chime_home" / "chunks"
