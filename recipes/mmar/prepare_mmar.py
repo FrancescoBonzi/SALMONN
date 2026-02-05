@@ -5,7 +5,7 @@ from pathlib import Path
 
 import tarfile
 import urllib.request
-
+import numpy as np
 import soundfile as sf
 import librosa
 from datasets import load_dataset
@@ -28,6 +28,10 @@ def resample_audio_dir(root_dir: Path, target_sr: int = TARGET_SAMPLE_RATE):
             if len(audio.shape) == 2:
                 audio = audio.mean(axis=1)
             audio = librosa.resample(audio, orig_sr=sr, target_sr=target_sr)
+
+            # Normalize audio peak
+            audio = audio / (np.abs(audio).max() + 1e-9)
+
             sf.write(path, audio, target_sr)
             resampled += 1
         except Exception as e:

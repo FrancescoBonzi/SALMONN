@@ -43,7 +43,7 @@ def string_match(answer, prediction, choices):
     return cond1 and cond2
 
 
-def official_mmar_evaluation(input_data: list[dict]):
+def official_mmau_evaluation(input_data: list[dict]):
 
     corr, total = 0, 0
 
@@ -135,7 +135,7 @@ def official_mmar_evaluation(input_data: list[dict]):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Evaluate SALMONN ASR with WER/CER")
+    parser = argparse.ArgumentParser(description="Evaluate SALMONN MMAU")
     parser.add_argument("--cfg-path", type=str, required=True, help="Path to config file")
     parser.add_argument("--ckpt", type=str, required=True, help="Path to model checkpoint")
     parser.add_argument("--batch-size", type=int, default=4, help="Batch size for inference")
@@ -155,7 +155,7 @@ def main():
     cfg = Config(args)
 
     print("=" * 60)
-    print("SALMONN MMAR Evaluation")
+    print("SALMONN MMAU Evaluation")
     print("=" * 60)
     print(f"Checkpoint: {args.ckpt}")
     print(f"Device: {args.device}")
@@ -260,17 +260,17 @@ def main():
     print(f"Results saved to {os.path.join(args.output_dir, 'results.json')}")
 
     # Compute metrics
-    corr, total = official_mmar_evaluation(results)
-    print(f"Official MMAR Accuracy: {(corr/total) * 100:.2f}% over {total} samples")
+    corr, total = official_mmau_evaluation(results)
+    print(f"Official MMAU Accuracy: {(corr/total) * 100:.2f}% over {total} samples")
 
 
 if __name__ == "__main__":
     """
-    Evaluate SALMONN MMAR performance.
+    Evaluate SALMONN MMAU performance.
 
     Usage:
-        python evaluate.py \
-            --cfg-path recipes/mmar/salmonn.yaml \
+        python evaluate_mmau.py \
+            --cfg-path recipes/mmau/salmonn.yaml \
             --ckpt <checkpoint_path> \
     """
     main()
