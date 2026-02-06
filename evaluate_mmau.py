@@ -218,12 +218,12 @@ def main():
                     else:
                         question += "."
                 choices = "\n".join([
-                    f"{choice}" 
+                    f"{letter}) {choice}" 
                     for letter, choice in zip(
                         string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
                     )
                 ])
-                prompt = f"<Speech><SpeechHere></Speech> {question}\n{choices}\nAnswer with the choice directly."
+                prompt = f"<Speech><SpeechHere></Speech> {question}\n{choices}\nAnswer with the choice letter directly."
                 prompts.append(cfg.config.model.prompt_template.format(prompt))
             
             # Generate transcriptions
@@ -237,10 +237,16 @@ def main():
             for i, (ref, hyp, uid) in enumerate(zip(references, hypotheses, ids)):
                 # Clean up hypothesis (remove special tokens, extra whitespace)
                 hyp_clean = hyp.replace("</s>", "").replace("<s>", "").replace("<unk>", "").strip()
+
+                if hyp_clean.startswith(string.ascii_uppercase):
+                    model_output = metadata[uid]["choices"][string.ascii_uppercase.index(hyp_clean)]
+                else:
+                    model_output = hyp_clean
                 
                 results.append({
                     "id": uid,
-                    "model_output": hyp_clean,
+                    "model_output": model_output,
+                    "model_output_letter": hyp_clean,
                     "answer": ref,
                     "prompt": prompts[i],
                     "choices": metadata[uid]["choices"],
