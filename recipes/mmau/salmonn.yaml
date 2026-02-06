@@ -71,10 +71,10 @@ run:
     beta2: 0.999
 
 generate:
-  max_new_tokens: 3
+  max_new_tokens: 20
   num_beams: 4
   do_sample: False
-  min_length: 2
+  min_length: 3
   temperature: 1.0
   top_p: 0.9
   repetition_penalty: 1.0

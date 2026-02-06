@@ -218,12 +218,12 @@ def main():
                     else:
                         question += "."
                 choices = "\n".join([
-                    f"{letter}) {choice}" 
+                    f"{choice}" 
                     for letter, choice in zip(
                         string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
                     )
                 ])
-                prompt = f"<Speech><SpeechHere></Speech> {question}\n{choices}\nAnswer with the choice letter directly."
+                prompt = f"<Speech><SpeechHere></Speech> {question}  Select one option from the provided choices.\n{choices}"
                 prompts.append(cfg.config.model.prompt_template.format(prompt))
             
             # Generate transcriptions
