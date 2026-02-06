@@ -223,7 +223,7 @@ def main():
                         string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
                     )
                 ])
-                prompt = f"<Speech><SpeechHere></Speech> {question}\n{choices}\nAnswer with the choice directly."
+                prompt = f"<Speech><SpeechHere></Speech> {question}  Select one option from the provided choices.\n{choices}"
                 prompts.append(cfg.config.model.prompt_template.format(prompt))
             
             # Generate transcriptions
@@ -241,6 +241,7 @@ def main():
                 results.append({
                     "id": uid,
                     "model_prediction": hyp_clean,
+                    "hyp": hyp,
                     "answer": ref,
                     "prompt": prompts[i],
                     "choices": metadata[uid]["choices"],
