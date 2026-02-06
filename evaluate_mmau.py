@@ -240,7 +240,7 @@ def main():
                 
                 results.append({
                     "id": uid,
-                    "model_prediction": hyp_clean,
+                    "model_output": hyp_clean,
                     "answer": ref,
                     "prompt": prompts[i],
                     "choices": metadata[uid]["choices"],
