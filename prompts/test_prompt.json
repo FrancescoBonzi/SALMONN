@@ -24,5 +24,5 @@
     "speech_audio_coreasoning": "<Speech><SpeechHere></Speech> Use your strong reasoning skills to answer the speaker's question in detail based on the background sound.",
     "keywords": "<Speech><SpeechHere></Speech> Give me only three keywords of the text.",
     "speaker_diarization_asr": "<Speech><SpeechHere></Speech> Please recognize each speaker and transcribe their speech content.",
-    "audio_reasoning": "<Speech><SpeechHere></Speech> Please answer the question in detail based on the audio. Show your reasoning process step by step."
+    "reasoning": "<Speech><SpeechHere></Speech> Output the answer with <SUMMARY>, <CAPTION>, <REASONING>, and <CONCLUSION> tags."
 }
