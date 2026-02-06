@@ -48,8 +48,8 @@ def prepare_cot_clotho_aqa_annotations(output_dir: str):
         train_annotations.append({
             "path": audio_path,
             "task": "reasoning",
-            "prompt": item["conversations"][0]["value"].replace("<sound>", ""),
-            "text": item["conversations"][1]["value"],
+            "question": item["conversations"][0]["value"].replace("<sound>", "").replace("Output the answer with <SUMMARY>, <CAPTION>, <REASONING>, and <CONCLUSION> tags.", "").strip(),
+            "answer": item["conversations"][1]["value"],
         })
 
     ann_path = output_dir / "annotations" / "train_clotho_aqa.json"

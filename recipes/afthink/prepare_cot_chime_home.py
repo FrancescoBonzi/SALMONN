@@ -22,8 +22,8 @@ def prepare_cot_chime_home_annotations(output_dir: str):
         train_annotations.append({
             "path": audio_path,
             "task": "reasoning",
-            "prompt": item["conversations"][0]["value"].replace("<sound>", "").strip(),
-            "text": item["conversations"][1]["value"].strip(),
+            "question": item["conversations"][0]["value"].replace("<sound>", "").replace("Output the answer with <SUMMARY>, <CAPTION>, <REASONING>, and <CONCLUSION> tags.", "").strip(),
+            "answer": item["conversations"][1]["value"].strip(),
         })
 
     ann_path = output_dir / "annotations" / "train_chime_home.json"
