@@ -1,0 +1,91 @@
+# LibriSpeech ASR Debug Config for SALMONN
+# Uses lightweight models for fast iteration and debugging
+
+model:
+  model_type: "salmonn"
+  
+  # MuToR hyperparameters
+  mutor_min_offset: 1
+  mutor_max_offset: 2
+  mutor_alpha: 0.1
+
+  # Mock LLaMA for CPU debugging (~19M params)
+  llama_path: "pretrained/mock-llama"
+  whisper_path: "pretrained/whisper-tiny"
+  beats_path: "pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt"
+
+  ckpt: ""
+
+  freeze_whisper: True
+  freeze_beats: True
+
+  # Window-level Q-Former
+  use_speech_Qformer: True
+  freeze_speech_QFormer: False
+  window_level_Qformer: True
+  num_speech_query_token: 1
+  second_per_window: 0.333333
+  second_stride: 0.333333
+
+  speech_llama_proj_model: ""
+  freeze_speech_llama_proj: False
+
+  # LoRA (efficient fine-tuning)
+  lora: True
+  lora_rank: 4
+  lora_alpha: 16
+  lora_dropout: 0.1
+
+  multi_prompt: True
+  prompt_template: "USER: {}\nASSISTANT:"
+  prompt_path: "prompts/train_prompt.json"
+  test_prompt_path: "prompts/test_prompt.json"
+  max_txt_len: 200
+  end_sym: "</s>"
+
+datasets:
+  train_ann_path: "data/afthink_debug/train_afthink.json"
+  valid_ann_path: "data/afthink_debug/valid_afthink.json"
+  test_ann_path: "data/afthink_debug/test_afthink.json"
+
+  whisper_path: "pretrained/whisper-tiny"
+
+run:
+  seed: 42
+  output_dir: "outputs/afthink_debug/mutor"
+  evaluate: False
+  save_only_best: True
+
+  log_freq: 1
+  epoch_based: False
+  iters_per_epoch: 100
+  accum_grad_iters: 1
+  batch_size_train: 2
+  batch_size_eval: 2
+  num_workers: 2
+
+  device: "cuda"
+  use_distributed: False
+  amp: True
+  world_size: 1
+  dist_url: "env://"
+
+  optims:
+    max_epoch: 1
+    warmup_steps: 10
+    warmup_start_lr: 1e-6
+    init_lr: 2e-5
+    min_lr: 1e-6
+    weight_decay: 0.05
+    beta2: 0.999
+
+generate:
+  max_new_tokens: 50
+  num_beams: 1
+  do_sample: False
+  min_length: 1
+  temperature: 1.0
+  top_p: 0.9
+  repetition_penalty: 1.0
+  length_penalty: 1.0
+
