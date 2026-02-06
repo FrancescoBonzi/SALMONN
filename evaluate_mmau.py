@@ -237,17 +237,10 @@ def main():
             for i, (ref, hyp, uid) in enumerate(zip(references, hypotheses, ids)):
                 # Clean up hypothesis (remove special tokens, extra whitespace)
                 hyp_clean = hyp.replace("</s>", "").replace("<s>", "").replace("<unk>", "").strip()
-
-                model_output = hyp_clean
-                for letter_idx, letter in enumerate(["A", "B", "C", "D"]):
-                    if hyp_clean.startswith(letter):
-                        model_output = metadata[uid]["choices"][letter_idx]
-                        break
                 
                 results.append({
                     "id": uid,
-                    "model_output": model_output,
-                    "model_output_letter": hyp_clean,
+                    "model_output": hyp_clean,
                     "hyp": hyp,
                     "answer": ref,
                     "prompt": prompts[i],
