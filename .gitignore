@@ -170,3 +170,6 @@ arnold.sh
 .vscode/
 pretrained/
 outputs/
+notebooks/
+annotations/
+test-mini-audios.tar
