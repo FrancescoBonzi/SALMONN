@@ -64,8 +64,7 @@ def prepare_mmau_annotations(output_dir: str):
         annotations.append({
             "path": audio_path,
             "text": item["answer"],
-            "task": "mmau",
-            **{key: value for key, value in item.items() if key != "audio_id" and key != "answer" and key != "task"}
+            **{key: value for key, value in item.items() if key != "audio_id" and key != "answer"}
         })
 
     ann_path = output_dir / "annotations" / "test_mmau.json"

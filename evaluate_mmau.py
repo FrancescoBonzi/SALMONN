@@ -48,19 +48,18 @@ def official_mmau_evaluation(input_data: list[dict]):
     corr, total = 0, 0
 
     # Track metrics for different categories:
-    modality_metrics = {'sound': [0, 0], 'music': [0, 0], 'speech': [0, 0], 'mix-sound-music': [0, 0], 'mix-sound-speech': [0, 0], 'mix-music-speech': [0, 0], 'mix-sound-music-speech': [0, 0]}
-    category_metrics = {'Signal Layer': [0, 0], 'Perception Layer': [0, 0], 'Semantic Layer': [0, 0], 'Cultural Layer': [0, 0]}
+    task_metrics = {'sound': [0, 0], 'music': [0, 0], 'speech': [0, 0]}
+    diff_metrics = {'easy': [0, 0], 'hard': [0, 0], 'medium': [0, 0]}
     
     # Here is the new dict for sub-category metrics
     subcat_metrics = {}
 
-    output_key = 'model_prediction' # The key that contains model output
+    output_key = 'model_output' # The key that contains model output
     no_pred_count = 0
     matched_outputs = []
     new_data = []
 
-    # for idx, sample in enumerate(tqdm(input_data)):
-    for idx, sample in enumerate(input_data):
+    for idx, sample in enumerate(tqdm(input_data)):
         
         # If there's no model output key, skip
         if output_key not in sample:
@@ -73,8 +72,8 @@ def official_mmau_evaluation(input_data: list[dict]):
             _prediction = sample[output_key]
 
         _answer = sample['answer']
-        modality = sample['modality']
-        category = sample['category']
+        task = sample['task']
+        difficulty = sample['difficulty']
         choices = sample['choices']
         
         # Get the sub-category
@@ -87,8 +86,8 @@ def official_mmau_evaluation(input_data: list[dict]):
         match_result = string_match(_answer, _prediction, choices)
 
         if match_result:
-            modality_metrics[modality][0] += 1
-            category_metrics[category][0] += 1
+            task_metrics[task][0] += 1
+            diff_metrics[difficulty][0] += 1
             if subcat is not None:
                 subcat_metrics[subcat][0] += 1
             matched_outputs.append([_answer, _prediction])
@@ -99,25 +98,26 @@ def official_mmau_evaluation(input_data: list[dict]):
 
         total += 1
         new_data.append(sample)
-        modality_metrics[modality][1] += 1
-        category_metrics[category][1] += 1
+        task_metrics[task][1] += 1
+        diff_metrics[difficulty][1] += 1
         if subcat is not None:
             subcat_metrics[subcat][1] += 1
 
+
     # Print results:
     print("*"*30)
-    print("Modality-wise Accuracy:")
-    for modality in modality_metrics:
-        n_correct, n_total = modality_metrics[modality]
+    print("Task-wise Accuracy:")
+    for task in task_metrics:
+        n_correct, n_total = task_metrics[task]
         acc = (n_correct / n_total) * 100 if n_total > 0 else 0
-        print(f"{modality} : {acc:.2f}% over {n_total} samples")
+        print(f"{task} : {acc:.2f}% over {n_total} samples")
     
     print("*"*30)
-    print("Category-wise Accuracy:")
-    for category in category_metrics:
-        n_correct, n_total = category_metrics[category]
+    print("Difficulty-wise Accuracy:")
+    for diff in diff_metrics:
+        n_correct, n_total = diff_metrics[diff]
         acc = (n_correct / n_total) * 100 if n_total > 0 else 0
-        print(f"{category} : {acc:.2f}% over {n_total} samples")
+        print(f"{diff} : {acc:.2f}% over {n_total} samples")
     
     print("*"*30)
     print("Sub-category-wise Accuracy:")
@@ -244,8 +244,8 @@ def main():
                     "answer": ref,
                     "prompt": prompts[i],
                     "choices": metadata[uid]["choices"],
-                    "modality": metadata[uid]["modality"],
-                    "category": metadata[uid]["category"],
+                    "difficulty": metadata[uid]["difficulty"],
+                    "task": metadata[uid]["task"],
                     "sub-category": metadata[uid]["sub-category"] if metadata[uid]["sub-category"] is not None else None,
                 })
 
