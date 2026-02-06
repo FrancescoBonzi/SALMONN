@@ -238,15 +238,17 @@ def main():
                 # Clean up hypothesis (remove special tokens, extra whitespace)
                 hyp_clean = hyp.replace("</s>", "").replace("<s>", "").replace("<unk>", "").strip()
 
-                if hyp_clean.startswith(string.ascii_uppercase):
-                    model_output = metadata[uid]["choices"][string.ascii_uppercase.index(hyp_clean)]
-                else:
-                    model_output = hyp_clean
+                model_output = hyp_clean
+                for letter_idx, letter in enumerate(["A", "B", "C", "D"]):
+                    if hyp_clean.startswith(letter):
+                        model_output = metadata[uid]["choices"][letter_idx]
+                        break
                 
                 results.append({
                     "id": uid,
                     "model_output": model_output,
                     "model_output_letter": hyp_clean,
+                    "hyp": hyp,
                     "answer": ref,
                     "prompt": prompts[i],
                     "choices": metadata[uid]["choices"],
