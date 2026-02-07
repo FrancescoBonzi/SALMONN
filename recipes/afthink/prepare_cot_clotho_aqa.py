@@ -71,14 +71,12 @@ if __name__ == "__main__":
         print("Downloading audio_files.zip...")
         urllib.request.urlretrieve(url, archive_path)
 
-    audio_files_dir = data_dir / "audio_files"
-    audio_files_dir.mkdir(parents=True, exist_ok=True)
     print("Extracting...")
     with zipfile.ZipFile(archive_path, "r") as zf:
-        zf.extractall(audio_files_dir)
+        zf.extractall(data_dir)
 
     print("Resampling audio to 16 kHz for Whisper...")
-    resample_audio_dir(audio_files_dir)
+    resample_audio_dir(data_dir)
 
     prepare_cot_clotho_aqa_annotations(str(data_dir))
 
