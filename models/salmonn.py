@@ -647,8 +647,11 @@ class MutorSALMONN(SALMONN):
         if self.prompt_dict:
             speech_embeds, speech_atts = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt)
         
-        # prepare inputs for LLM
-        text = [t + self.end_sym for t in samples["text"]]
+        # prepare inputs for LLM (use answer for reasoning tasks, text for ASR)
+        if "answer" in samples and any(samples["answer"]):
+            text = [t + self.end_sym for t in samples["answer"]]
+        else:
+            text = [t + self.end_sym for t in samples["text"]]
         to_regress_tokens = self.llama_tokenizer(
             text,
             return_tensors="pt",
