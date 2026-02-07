@@ -14,6 +14,52 @@ from models.salmonn import SALMONN, MutorSALMONN
 from dataset import SALMONNDataset
 
 
+def pretrained_prompt_template(batch, metadata, cfg):
+    # Create prompts for batch
+    prompts = []
+    for i in range(len(batch["id"])):
+        id = batch["id"][i]
+        question = metadata[id]["question"]
+        if not question.endswith("?") and not question.endswith("."):
+            if question.startswith(("Which", "What", "Who", "When", "Where", "Why", "How", "Are", "Is")):
+                question += "?"
+            else:
+                question += "."
+        choices = "\n".join([
+            f"{choice}" 
+            for letter, choice in zip(
+                string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
+            )
+        ])
+        prompt = f"<Speech><SpeechHere></Speech> {question}  Select one option from the provided choices.\n{choices}"
+        prompts.append(cfg.config.model.prompt_template.format(prompt))
+
+    return prompts
+
+
+def afthink_prompt_template(batch, metadata, cfg):
+    # Create prompts for batch
+    prompts = []
+    for i in range(len(batch["id"])):
+        id = batch["id"][i]
+        question = metadata[id]["question"]
+        if not question.endswith("?") and not question.endswith("."):
+            if question.startswith(("Which", "What", "Who", "When", "Where", "Why", "How", "Are", "Is")):
+                question += "?"
+            else:
+                question += "."
+        choices = "\n".join([
+            f"({letter}) {choice}" 
+            for letter, choice in zip(
+                string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
+            )
+        ])
+        prompt = f"{question} Choose the correct option from the following options:\n{choices}. USER: <Speech><SpeechHere></Speech> Output the answer with <SUMMARY>, <CAPTION>, <REASONING>, and <CONCLUSION> tags.\nASSISTANT:"
+        prompts.append(prompt)
+    
+    return prompts
+
+
 def string_match(answer, prediction, choices):
     # Function to normalize and tokenize text
     def tokenize(text):
@@ -207,24 +253,10 @@ def main():
             batch["raw_wav"] = batch["raw_wav"].to(args.device)
             batch["padding_mask"] = batch["padding_mask"].to(args.device)
 
-            # Create prompts for batch
-            prompts = []
-            for i in range(len(batch["id"])):
-                id = batch["id"][i]
-                question = metadata[id]["question"]
-                if not question.endswith("?") and not question.endswith("."):
-                    if question.startswith(("Which", "What", "Who", "When", "Where", "Why", "How", "Are", "Is")):
-                        question += "?"
-                    else:
-                        question += "."
-                choices = "\n".join([
-                    f"{choice}" 
-                    for letter, choice in zip(
-                        string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
-                    )
-                ])
-                prompt = f"<Speech><SpeechHere></Speech> {question}  Select one option from the provided choices.\n{choices}"
-                prompts.append(cfg.config.model.prompt_template.format(prompt))
+            if "Clotho-AQA" in cfg.config.datasets.test_ann_path:
+                prompts = afthink_prompt_template(batch, metadata, cfg)
+            else:
+                prompts = pretrained_prompt_template(batch, metadata, cfg)
             
             # Generate transcriptions
             with torch.amp.autocast('cuda', dtype=torch.float16):
@@ -237,10 +269,16 @@ def main():
             for i, (ref, hyp, uid) in enumerate(zip(references, hypotheses, ids)):
                 # Clean up hypothesis (remove special tokens, extra whitespace)
                 hyp_clean = hyp.replace("</s>", "").replace("<s>", "").replace("<unk>", "").strip()
+                # Extract the CONCLUSION tag from the hypothesis
+                conclusion_tags = re.search(r"<CONCLUSION>(.*?)</CONCLUSION>", hyp_clean)
+                if conclusion_tags is not None:
+                    conclusion = conclusion_tags.group(1).strip()
+                else:
+                    conclusion = hyp_clean
                 
                 results.append({
                     "id": uid,
-                    "model_output": hyp_clean,
+                    "model_output": conclusion,
                     "hyp": hyp,
                     "answer": ref,
                     "prompt": prompts[i],
@@ -256,9 +294,9 @@ def main():
                 torch.cuda.empty_cache()
 
     # Save results
-    with open(os.path.join(args.output_dir, "results.json"), "w") as f:
+    with open(os.path.join(args.output_dir, "results_mmau.json"), "w") as f:
         json.dump(results, f, indent=2)
-    print(f"Results saved to {os.path.join(args.output_dir, 'results.json')}")
+    print(f"Results saved to {os.path.join(args.output_dir, 'results_mmau.json')}")
 
     # Compute metrics
     corr, total = official_mmau_evaluation(results)
