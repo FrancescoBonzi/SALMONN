@@ -76,7 +76,9 @@ python evaluate_mmau.py \
     model.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
     model.beats_path="$SLURM_TMPDIR/pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" \
     datasets.test_ann_path="$SLURM_TMPDIR/data/MMAU/annotations/test_mmau.json" \
-    datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2"
+    datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
+    run.seed="$seed" \
+    run.num_workers="$SLURM_CPUS_PER_TASK"
 
 echo "Evaluating MMAR..."
 
@@ -93,6 +95,8 @@ python evaluate_mmar.py \
     model.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
     model.beats_path="$SLURM_TMPDIR/pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" \
     datasets.test_ann_path="$SLURM_TMPDIR/data/MMAR/annotations/test_mmar.json" \
-    datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2"
+    datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
+    run.seed="$seed" \
+    run.num_workers="$SLURM_CPUS_PER_TASK"
 
 echo "MMAU and MMAR evaluation finished at $(date)"
