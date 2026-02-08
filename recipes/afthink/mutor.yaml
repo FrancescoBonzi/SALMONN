@@ -39,7 +39,7 @@ model:
   prompt_template: "USER: {}\nASSISTANT:"
   prompt_path: "prompts/train_prompt.json"
   test_prompt_path: "prompts/test_prompt.json"
-  max_txt_len: 500
+  max_txt_len: 400
   end_sym: "</s>"
 
 datasets:
@@ -79,7 +79,7 @@ run:
     beta2: 0.999
 
 generate:
-  max_new_tokens: 200
+  max_new_tokens: 300
   num_beams: 4
   do_sample: False
   min_length: 1

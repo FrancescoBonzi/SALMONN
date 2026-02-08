@@ -53,8 +53,8 @@ run:
   log_freq: 10
   epoch_based: False
   iters_per_epoch: 5000
-  accum_grad_iters: 4
-  batch_size_train: 8
+  accum_grad_iters: 8
+  batch_size_train: 4
   batch_size_eval: 8
   num_workers: 4
 
@@ -74,7 +74,7 @@ run:
     beta2: 0.999
 
 generate:
-  max_new_tokens: 200
+  max_new_tokens: 300
   num_beams: 4
   do_sample: False
   min_length: 1
