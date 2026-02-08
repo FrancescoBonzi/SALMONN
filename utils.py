@@ -14,6 +14,7 @@
 
 import logging
 import time
+import string
 
 import torch
 from torch.utils.data import DataLoader, DistributedSampler
@@ -156,3 +157,63 @@ def prepare_one_sample(wav_path, wav_processor, cuda_enabled=True):
         samples = move_to_cuda(samples)
 
     return samples
+
+
+########################
+### Prompt templates ###
+########################
+
+
+def pretrained_prompt_template(batch, metadata, cfg):
+    # Create prompts for batch
+    prompts = []
+    for i in range(len(batch["id"])):
+        id = batch["id"][i]
+        question = metadata[id]["question"]
+        if not question.endswith("?") and not question.endswith("."):
+            if question.startswith(("Which", "What", "Who", "When", "Where", "Why", "How", "Are", "Is")):
+                question += "?"
+            else:
+                question += "."
+        choices = "\n".join([
+            f"{choice}" 
+            for letter, choice in zip(
+                string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
+            )
+        ])
+        prompt = f"<Speech><SpeechHere></Speech> {question}  Select one option from the provided choices.\n{choices}"
+        prompts.append(cfg.config.model.prompt_template.format(prompt))
+
+    return prompts
+
+
+def afthink_prompt_template(batch, metadata, cfg):
+    # Create prompts for batch
+    prompts = []
+    for i in range(len(batch["id"])):
+        id = batch["id"][i]
+        question = metadata[id]["question"]
+        if not question.endswith("?") and not question.endswith("."):
+            if question.startswith(("Which", "What", "Who", "When", "Where", "Why", "How", "Are", "Is")):
+                question += "?"
+            else:
+                question += "."
+        choices = "\n".join([
+            f"({letter}) {choice}" 
+            for letter, choice in zip(
+                string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
+            )
+        ])
+        prompt = f"{question} Choose the correct option from the following options:\n{choices}. USER: <Speech><SpeechHere></Speech> Output the answer with <SUMMARY>, <CAPTION>, <REASONING>, and <CONCLUSION> tags.\nASSISTANT:"
+        prompts.append(prompt)
+    
+    return prompts
+
+
+def get_prompts(batch, metadata, cfg, prompt_type="official"):
+    if prompt_type == "official":
+        return pretrained_prompt_template(batch, metadata, cfg)
+    elif prompt_type == "afthink":
+        return afthink_prompt_template(batch, metadata, cfg)
+    else:
+        raise ValueError(f"Invalid prompt type: {prompt_type}")

@@ -1,9 +1,7 @@
 import argparse
 import json
-import os
 import re
 import string
-from typing import Any
 from tqdm import tqdm
 
 import torch
@@ -12,6 +10,7 @@ from torch.utils.data import DataLoader
 from config import Config
 from models.salmonn import SALMONN, MutorSALMONN
 from dataset import SALMONNDataset
+from utils import get_prompts
 
 
 def pretrained_prompt_template(batch, metadata, cfg):
@@ -187,7 +186,8 @@ def parse_args():
     parser.add_argument("--batch-size", type=int, default=4, help="Batch size for inference")
     parser.add_argument("--num-workers", type=int, default=4, help="DataLoader workers")
     parser.add_argument("--device", type=str, default="cuda:0", help="Device to use")
-    parser.add_argument("--output-dir", type=str, default="eval_results", help="Output directory")
+    parser.add_argument("--output-file", type=str, default="outputs/mmau/results.json", help="Output file")
+    parser.add_argument("--prompt-type", type=str, default="official", help="Prompt type")
     parser.add_argument(
         "--options",
         nargs="+",
@@ -253,10 +253,7 @@ def main():
             batch["raw_wav"] = batch["raw_wav"].to(args.device)
             batch["padding_mask"] = batch["padding_mask"].to(args.device)
 
-            if "Clotho-AQA" in cfg.config.datasets.test_ann_path:
-                prompts = afthink_prompt_template(batch, metadata, cfg)
-            else:
-                prompts = pretrained_prompt_template(batch, metadata, cfg)
+            prompts = get_prompts(batch, metadata, cfg, prompt_type=args.prompt_type)
             
             # Generate transcriptions
             with torch.amp.autocast('cuda', dtype=torch.float16):
@@ -294,9 +291,9 @@ def main():
                 torch.cuda.empty_cache()
 
     # Save results
-    with open(os.path.join(args.output_dir, "results_mmau.json"), "w") as f:
+    with open(args.output_file, "w") as f:
         json.dump(results, f, indent=2)
-    print(f"Results saved to {os.path.join(args.output_dir, 'results_mmau.json')}")
+    print(f"Results saved to {args.output_file}")
 
     # Compute metrics
     corr, total = official_mmau_evaluation(results)

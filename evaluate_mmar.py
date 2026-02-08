@@ -1,9 +1,7 @@
 import argparse
 import json
-import os
 import re
 import string
-from typing import Any
 from tqdm import tqdm
 
 import torch
@@ -12,52 +10,7 @@ from torch.utils.data import DataLoader
 from config import Config
 from models.salmonn import SALMONN, MutorSALMONN
 from dataset import SALMONNDataset
-
-
-def pretrained_prompt_template(batch, metadata, cfg):
-    # Create prompts for batch
-    prompts = []
-    for i in range(len(batch["id"])):
-        id = batch["id"][i]
-        question = metadata[id]["question"]
-        if not question.endswith("?") and not question.endswith("."):
-            if question.startswith(("Which", "What", "Who", "When", "Where", "Why", "How", "Are", "Is")):
-                question += "?"
-            else:
-                question += "."
-        choices = "\n".join([
-            f"{choice}" 
-            for letter, choice in zip(
-                string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
-            )
-        ])
-        prompt = f"<Speech><SpeechHere></Speech> {question}  Select one option from the provided choices.\n{choices}"
-        prompts.append(cfg.config.model.prompt_template.format(prompt))
-
-    return prompts
-
-
-def afthink_prompt_template(batch, metadata, cfg):
-    # Create prompts for batch
-    prompts = []
-    for i in range(len(batch["id"])):
-        id = batch["id"][i]
-        question = metadata[id]["question"]
-        if not question.endswith("?") and not question.endswith("."):
-            if question.startswith(("Which", "What", "Who", "When", "Where", "Why", "How", "Are", "Is")):
-                question += "?"
-            else:
-                question += "."
-        choices = "\n".join([
-            f"({letter}) {choice}" 
-            for letter, choice in zip(
-                string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
-            )
-        ])
-        prompt = f"{question} Choose the correct option from the following options:\n{choices}. USER: <Speech><SpeechHere></Speech> Output the answer with <SUMMARY>, <CAPTION>, <REASONING>, and <CONCLUSION> tags.\nASSISTANT:"
-        prompts.append(prompt)
-    
-    return prompts
+from utils import get_prompts
 
 
 def string_match(answer, prediction, choices):
@@ -181,13 +134,14 @@ def official_mmar_evaluation(input_data: list[dict]):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Evaluate SALMONN ASR with WER/CER")
+    parser = argparse.ArgumentParser(description="Evaluate SALMONN on MMAR benchmark")
     parser.add_argument("--cfg-path", type=str, required=True, help="Path to config file")
     parser.add_argument("--ckpt", type=str, required=True, help="Path to model checkpoint")
     parser.add_argument("--batch-size", type=int, default=4, help="Batch size for inference")
     parser.add_argument("--num-workers", type=int, default=4, help="DataLoader workers")
     parser.add_argument("--device", type=str, default="cuda:0", help="Device to use")
-    parser.add_argument("--output-dir", type=str, default="eval_results", help="Output directory")
+    parser.add_argument("--output-file", type=str, default="outputs/mmar/results.json", help="Output file")
+    parser.add_argument("--prompt-type", type=str, default="official", help="Prompt type")
     parser.add_argument(
         "--options",
         nargs="+",
@@ -253,10 +207,7 @@ def main():
             batch["raw_wav"] = batch["raw_wav"].to(args.device)
             batch["padding_mask"] = batch["padding_mask"].to(args.device)
 
-            if "Clotho-AQA" in cfg.config.datasets.test_ann_path:
-                prompts = afthink_prompt_template(batch, metadata, cfg)
-            else:
-                prompts = pretrained_prompt_template(batch, metadata, cfg)
+            prompts = get_prompts(batch, metadata, cfg, prompt_type=args.prompt_type)
             
             # Generate transcriptions
             with torch.amp.autocast('cuda', dtype=torch.float16):
@@ -294,9 +245,9 @@ def main():
                 torch.cuda.empty_cache()
 
     # Save results
-    with open(os.path.join(args.output_dir, "results_mmar.json"), "w") as f:
+    with open(args.output_file, "w") as f:
         json.dump(results, f, indent=2)
-    print(f"Results saved to {os.path.join(args.output_dir, 'results_mmar.json')}")
+    print(f"Results saved to {args.output_file}")
 
     # Compute metrics
     corr, total = official_mmar_evaluation(results)

@@ -14,7 +14,12 @@ seeds=(42)
 # Get the seed for this job array index
 seed=${seeds[$SLURM_ARRAY_TASK_ID]}
 
+# Define config variables
 model_type="salmonn"
+ckpt_path="pretrained/salmonn_v1.pth"
+ckpt_type="pretrained"
+prompt_type="official"
+eval_filename="${model_type}_13B_${ckpt_type}_${prompt_type}prompt_seed${seed}.json"
 
 # Copy data to SLURM_TMPDIR for fast I/O
 echo "Copying data to SLURM_TMPDIR..."
@@ -39,7 +44,7 @@ COPY_VICUNA_PID=$!
 cp "pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" "$SLURM_TMPDIR/pretrained/" &
 COPY_BEATS_PID=$!
 
-cp "pretrained/salmonn_v1.pth" "$SLURM_TMPDIR/pretrained/" &
+cp "$ckpt_path" "$SLURM_TMPDIR/pretrained/ckpt.pth" &
 COPY_SALMONN_PID=$!
 
 # Wait for all copies to finish
@@ -56,18 +61,33 @@ module load httpproxy
 source .venv/bin/activate
 
 # Run evaluation on the best checkpoint
-echo "Starting evaluation..."
+echo "Evaluating MMAU..."
 
-EVAL_DIR="outputs/mmar/salmonn/$seed/eval_results"
-mkdir -p "$EVAL_DIR"
-
-python evaluate_mmar.py \
-    --cfg-path recipes/mmar/salmonn.yaml \
-    --ckpt "$SLURM_TMPDIR/pretrained/salmonn_v1.pth" \
+python evaluate_mmau.py \
+    --cfg-path recipes/afthink/$model_type.yaml \
+    --ckpt "$SLURM_TMPDIR/pretrained/ckpt.pth" \
     --batch-size 4 \
     --num-workers "$SLURM_CPUS_PER_TASK" \
     --device cuda:0 \
-    --output-dir "$EVAL_DIR" \
+    --output-file "outputs/mmau/$eval_filename" \
+    --prompt-type "$prompt_type" \
+    --options \
+    model.llama_path="$SLURM_TMPDIR/pretrained/vicuna-13b-v1.1" \
+    model.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
+    model.beats_path="$SLURM_TMPDIR/pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" \
+    datasets.test_ann_path="$SLURM_TMPDIR/data/MMAU/annotations/test_mmau.json" \
+    datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2"
+
+echo "Evaluating MMAR..."
+
+python evaluate_mmar.py \
+    --cfg-path recipes/afthink/$model_type.yaml \
+    --ckpt "$SLURM_TMPDIR/pretrained/ckpt.pth" \
+    --batch-size 4 \
+    --num-workers "$SLURM_CPUS_PER_TASK" \
+    --device cuda:0 \
+    --output-file "outputs/mmar/$eval_filename" \
+    --prompt-type "$prompt_type" \
     --options \
     model.llama_path="$SLURM_TMPDIR/pretrained/vicuna-13b-v1.1" \
     model.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
@@ -75,5 +95,4 @@ python evaluate_mmar.py \
     datasets.test_ann_path="$SLURM_TMPDIR/data/MMAR/annotations/test_mmar.json" \
     datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2"
 
-echo "MMAR evaluation finished at $(date)"
-echo "Job finished at $(date)"
+echo "MMAU and MMAR evaluation finished at $(date)"

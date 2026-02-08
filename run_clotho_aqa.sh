@@ -14,7 +14,12 @@ seeds=(42)
 # Get the seed for this job array index
 seed=${seeds[$SLURM_ARRAY_TASK_ID]}
 
+# Define config variables
 model_type="salmonn"
+ckpt_path="pretrained/salmonn_v1.pth"
+ckpt_type="pretrained"
+prompt_type="official"
+eval_filename="${model_type}_13B_${ckpt_type}_${prompt_type}prompt_seed${seed}.json"
 
 # Copy data to SLURM_TMPDIR for fast I/O
 echo "Copying data to SLURM_TMPDIR..."
@@ -48,7 +53,7 @@ COPY_VICUNA_PID=$!
 cp "pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" "$SLURM_TMPDIR/pretrained/" &
 COPY_BEATS_PID=$!
 
-cp "pretrained/salmonn_v1.pth" "$SLURM_TMPDIR/pretrained/" &
+cp "$ckpt_path" "$SLURM_TMPDIR/pretrained/ckpt.pth" &
 COPY_SALMONN_PID=$!
 
 # Wait for all copies to finish
@@ -73,7 +78,7 @@ torchrun --nproc_per_node=4 train.py --cfg-path recipes/afthink/$model_type.yaml
     model.llama_path="$SLURM_TMPDIR/pretrained/vicuna-13b-v1.1" \
     model.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
     model.beats_path="$SLURM_TMPDIR/pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" \
-    model.ckpt="$SLURM_TMPDIR/pretrained/salmonn_v1.pth" \
+    model.ckpt="$SLURM_TMPDIR/pretrained/ckpt.pth" \
     datasets.train_ann_path="$SLURM_TMPDIR/data/Clotho-AQA/annotations/train_clotho_aqa.json" \
     datasets.valid_ann_path="$SLURM_TMPDIR/data/Clotho-AQA/annotations/train_clotho_aqa.json" \
     datasets.test_ann_path="$SLURM_TMPDIR/data/Clotho-AQA/annotations/train_clotho_aqa.json" \
@@ -90,21 +95,20 @@ echo "Starting evaluation..."
 # Find the output directory
 OUTPUT_DIR=$(ls -dt outputs/afthink_clotho_aqa/$model_type/$seed/* | head -n 1)
 BEST_CKPT="${OUTPUT_DIR}/checkpoint_best.pth"
-EVAL_OUTPUT="${OUTPUT_DIR}/eval_results"
 
 echo "Using checkpoint: $BEST_CKPT"
-echo "Saving evaluation results to: $EVAL_OUTPUT"
 
-mkdir -p "$EVAL_OUTPUT"
+# Run evaluation on the best checkpoint
+echo "Evaluating MMAU..."
 
-echo "Evaluating MMAU at $(date)"
 python evaluate_mmau.py \
     --cfg-path recipes/afthink/$model_type.yaml \
     --ckpt "$BEST_CKPT" \
     --batch-size 4 \
     --num-workers "$SLURM_CPUS_PER_TASK" \
     --device cuda:0 \
-    --output-dir "$EVAL_OUTPUT" \
+    --output-file "outputs/mmau/$eval_filename" \
+    --prompt-type "$prompt_type" \
     --options \
     model.llama_path="$SLURM_TMPDIR/pretrained/vicuna-13b-v1.1" \
     model.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
@@ -112,14 +116,16 @@ python evaluate_mmau.py \
     datasets.test_ann_path="$SLURM_TMPDIR/data/MMAU/annotations/test_mmau.json" \
     datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2"
 
-echo "Evaluating MMAR at $(date)"
+echo "Evaluating MMAR..."
+
 python evaluate_mmar.py \
     --cfg-path recipes/afthink/$model_type.yaml \
     --ckpt "$BEST_CKPT" \
     --batch-size 4 \
     --num-workers "$SLURM_CPUS_PER_TASK" \
     --device cuda:0 \
-    --output-dir "$EVAL_OUTPUT" \
+    --output-file "outputs/mmar/$eval_filename" \
+    --prompt-type "$prompt_type" \
     --options \
     model.llama_path="$SLURM_TMPDIR/pretrained/vicuna-13b-v1.1" \
     model.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
@@ -127,4 +133,4 @@ python evaluate_mmar.py \
     datasets.test_ann_path="$SLURM_TMPDIR/data/MMAR/annotations/test_mmar.json" \
     datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2"
 
-echo "Evaluation finished at $(date)"
+echo "MMAU and MMAR evaluation finished at $(date)"
