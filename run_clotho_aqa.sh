@@ -19,10 +19,23 @@ model_type="salmonn"
 # Copy data to SLURM_TMPDIR for fast I/O
 echo "Copying data to SLURM_TMPDIR..."
 
-# Copy LibriSpeech audio data
+# Copy Clotho-AQA dataset
 mkdir -p "$SLURM_TMPDIR/data"
 cp -r "data/Clotho-AQA" "$SLURM_TMPDIR/data/" &
 COPY_DATA_PID=$!
+
+# Copy MMAR and MMAU benchmarks
+mkdir -p "$SLURM_TMPDIR/data/MMAR"
+cp -r "data/MMAR" "$SLURM_TMPDIR/data/" &
+COPY_MMAR_PID=$!
+
+mkdir -p "$SLURM_TMPDIR/data/MMAU"
+cp -r "data/MMAU" "$SLURM_TMPDIR/data/" &
+COPY_MMAU_PID=$!
+
+# Wait for all copies to finish
+wait $COPY_DATA_PID $COPY_MMAR_PID $COPY_MMAU_PID
+echo "Data copy complete!"
 
 # Copy pretrained models
 mkdir -p "$SLURM_TMPDIR/pretrained"
@@ -39,8 +52,8 @@ cp "pretrained/salmonn_v1.pth" "$SLURM_TMPDIR/pretrained/" &
 COPY_SALMONN_PID=$!
 
 # Wait for all copies to finish
-wait $COPY_DATA_PID $COPY_WHISPER_PID $COPY_VICUNA_PID $COPY_BEATS_PID $COPY_SALMONN_PID
-echo "Data and pretrained models copy complete!"
+wait $COPY_WHISPER_PID $COPY_VICUNA_PID $COPY_BEATS_PID $COPY_SALMONN_PID
+echo "Pretrained models copy complete!"
 
 # Update annotation paths to point to SLURM_TMPDIR
 # Replace any absolute path ending with /data/Clotho-AQA
