@@ -25,21 +25,33 @@ eval_filename="${model_type}_13B_${ckpt_type}_${prompt_type}prompt_seed${seed}.j
 echo "Copying data to SLURM_TMPDIR..."
 
 # Copy Clotho-AQA dataset
-mkdir -p "$SLURM_TMPDIR/data"
-cp -r "data/Clotho-AQA" "$SLURM_TMPDIR/data/" &
-COPY_DATA_PID=$!
+mkdir -p "$SLURM_TMPDIR/data/Clotho-AQA/audio_files"
+cp -r "data/Clotho-AQA/audio_files" "$SLURM_TMPDIR/data/Clotho-AQA/audio_files/" &
+COPY_CLOTH_AUDIO_DATA_PID=$!
+
+mkdir -p "$SLURM_TMPDIR/data/Clotho-AQA/annotations"
+cp -r "data/Clotho-AQA/annotations" "$SLURM_TMPDIR/data/Clotho-AQA/annotations/" &
+COPY_CLOTH_ANN_DATA_PID=$!
 
 # Copy MMAR and MMAU benchmarks
-mkdir -p "$SLURM_TMPDIR/data/MMAR"
-cp -r "data/MMAR" "$SLURM_TMPDIR/data/" &
-COPY_MMAR_PID=$!
+mkdir -p "$SLURM_TMPDIR/data/MMAR/audio_files"
+cp -r "data/MMAR/audio_files" "$SLURM_TMPDIR/data/MMAR/audio_files/" &
+COPY_MMAR_AUDIO_DATA_PID=$!
 
-mkdir -p "$SLURM_TMPDIR/data/MMAU"
-cp -r "data/MMAU" "$SLURM_TMPDIR/data/" &
-COPY_MMAU_PID=$!
+mkdir -p "$SLURM_TMPDIR/data/MMAR/annotations"
+cp -r "data/MMAR/annotations" "$SLURM_TMPDIR/data/MMAR/annotations/" &
+COPY_MMAR_ANN_DATA_PID=$!
+
+mkdir -p "$SLURM_TMPDIR/data/MMAU/audio_files"
+cp -r "data/MMAU/audio_files" "$SLURM_TMPDIR/data/MMAU/audio_files/" &
+COPY_MMAU_AUDIO_DATA_PID=$!
+
+mkdir -p "$SLURM_TMPDIR/data/MMAU/annotations"
+cp -r "data/MMAU/annotations" "$SLURM_TMPDIR/data/MMAU/annotations/" &
+COPY_MMAU_ANN_DATA_PID=$!
 
 # Wait for all copies to finish
-wait $COPY_DATA_PID $COPY_MMAR_PID $COPY_MMAU_PID
+wait $COPY_CLOTH_AUDIO_DATA_PID $COPY_CLOTH_ANN_DATA_PID $COPY_MMAR_AUDIO_DATA_PID $COPY_MMAR_ANN_DATA_PID $COPY_MMAU_AUDIO_DATA_PID $COPY_MMAU_ANN_DATA_PID
 echo "Data copy complete!"
 
 # Copy pretrained models
@@ -99,7 +111,7 @@ BEST_CKPT="${OUTPUT_DIR}/checkpoint_best.pth"
 echo "Using checkpoint: $BEST_CKPT"
 
 # Run evaluation on the best checkpoint
-echo "Evaluating MMAU..."
+echo "Evaluating MMAU (cuda:0) and MMAR (cuda:1) in parallel..."
 
 python evaluate_mmau.py \
     --cfg-path recipes/afthink/$model_type.yaml \
@@ -116,7 +128,9 @@ python evaluate_mmau.py \
     datasets.test_ann_path="$SLURM_TMPDIR/data/MMAU/annotations/test_mmau.json" \
     datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
     run.seed="$seed" \
-    run.num_workers="$SLURM_CPUS_PER_TASK"
+    run.num_workers="$SLURM_CPUS_PER_TASK" \
+    &
+MMAU_PID=$!
 
 echo "Evaluating MMAR..."
 
@@ -125,7 +139,7 @@ python evaluate_mmar.py \
     --ckpt "$BEST_CKPT" \
     --batch-size 4 \
     --num-workers "$SLURM_CPUS_PER_TASK" \
-    --device cuda:0 \
+    --device cuda:1 \
     --output-file "outputs/mmar/$eval_filename" \
     --prompt-type "$prompt_type" \
     --options \
@@ -135,6 +149,10 @@ python evaluate_mmar.py \
     datasets.test_ann_path="$SLURM_TMPDIR/data/MMAR/annotations/test_mmar.json" \
     datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
     run.seed="$seed" \
-    run.num_workers="$SLURM_CPUS_PER_TASK"
+    run.num_workers="$SLURM_CPUS_PER_TASK" \
+    &
 
+MMAR_PID=$!
+
+wait $MMAU_PID $MMAR_PID
 echo "MMAU and MMAR evaluation finished at $(date)"
