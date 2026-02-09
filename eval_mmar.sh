@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --time=1:0:0
-#SBATCH --account=aip-csubakan
+#SBATCH --account=def-ravanelm
 #SBATCH --cpus-per-task=48
 #SBATCH --mem=488G
 #SBATCH --ntasks=1
