@@ -223,29 +223,7 @@ def main():
                         string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
                     )
                 ])
-                modality_instructions = {
-                    'sound': "Listen carefully to the sound event and answer the following question.",
-                    'music': "Analyze the musical content and answer the following question.",
-                    'speech': "Listen to the speech content and answer the following question.",
-                    'mix-sound-music': "Listen to both the sound and music elements and answer the following question.",
-                    'mix-sound-speech': "Listen to both the sound and speech elements and answer the following question.",
-                    'mix-music-speech': "Listen to both the music and speech elements and answer the following question.",
-                    'mix-sound-music-speech': "Listen to all audio elements (sound, music, and speech) and answer the following question."
-                }
-
-                instruction = modality_instructions.get(metadata[id]["modality"],
-                                                        "Listen carefully and answer the following question.")
-
-                prompt = f"""<Speech><SpeechHere></Speech>
-
-                {instruction}
-
-                {question}
-
-                {choices}
-                Select the most accurate answer."""
-
-                # prompt = f"<Speech><SpeechHere></Speech> {question}  Select one option from the provided choices.\n{choices}"
+                prompt = f"<Speech><SpeechHere></Speech> {question}  Select one option from the provided choices.\n{choices}"
                 prompts.append(cfg.config.model.prompt_template.format(prompt))
             
             # Generate transcriptions
