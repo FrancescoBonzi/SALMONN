@@ -14,58 +14,81 @@ from models.salmonn import SALMONN, MutorSALMONN
 from dataset import SALMONNDataset
 
 
+def extract_final_answer(response):
+    """Extract final answer from CoT response."""
+    # Look for common patterns like "Therefore, the answer is X" or "Final answer: X"
+    patterns = [
+        r"(?:therefore|thus|so|hence),?\s+(?:the\s+)?answer\s+is\s+[:\-]?\s*(.+?)(?:\.|$)",
+        r"final\s+answer\s*[:\-]\s*(.+?)(?:\.|$)",
+        r"answer\s*[:\-]\s*(.+?)(?:\.|$)",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, response.lower())
+        if match:
+            return match.group(1).strip()
+
+    # If no pattern found, return the last sentence as fallback
+    sentences = re.split(r'[.!?]+', response.strip())
+    if sentences:
+        return sentences[-1].strip()
+
+    return response.strip()
+
+
 def string_match(answer, prediction, choices):
     # Function to normalize and tokenize text
     def tokenize(text):
         # Convert to lowercase and find all word tokens
         return set(re.findall(r'\b\w+\b', text.lower()))
-    
+
     # Tokenize prediction and answer
     prediction_tokens = tokenize(prediction)
     answer_tokens = tokenize(answer)
-    
+
     if not prediction_tokens:
         return False
-    
+
     # Tokenize incorrect choices and exclude tokens present in the answer
     incorrect_tokens = set()
     for choice in choices:
         choice_tokens = tokenize(choice)
         if choice_tokens != answer_tokens:
             incorrect_tokens.update(choice_tokens - answer_tokens)
-    
+
     # Condition 1: All tokens of the answer are in the prediction
     cond1 = answer_tokens.issubset(prediction_tokens)
-    
+
     # Condition 2: Prediction does not contain any tokens from incorrect choices (excluding shared words)
     cond2 = prediction_tokens.isdisjoint(incorrect_tokens)
-    
+
     return cond1 and cond2
 
 
 def official_mmar_evaluation(input_data: list[dict]):
-
     corr, total = 0, 0
 
     # Track metrics for different categories:
-    modality_metrics = {'sound': [0, 0], 'music': [0, 0], 'speech': [0, 0], 'mix-sound-music': [0, 0], 'mix-sound-speech': [0, 0], 'mix-music-speech': [0, 0], 'mix-sound-music-speech': [0, 0]}
-    category_metrics = {'Signal Layer': [0, 0], 'Perception Layer': [0, 0], 'Semantic Layer': [0, 0], 'Cultural Layer': [0, 0]}
-    
+    modality_metrics = {'sound': [0, 0], 'music': [0, 0], 'speech': [0, 0], 'mix-sound-music': [0, 0],
+                        'mix-sound-speech': [0, 0], 'mix-music-speech': [0, 0], 'mix-sound-music-speech': [0, 0]}
+    category_metrics = {'Signal Layer': [0, 0], 'Perception Layer': [0, 0], 'Semantic Layer': [0, 0],
+                        'Cultural Layer': [0, 0]}
+
     # Here is the new dict for sub-category metrics
     subcat_metrics = {}
 
-    output_key = 'model_prediction' # The key that contains model output
+    output_key = 'model_prediction'  # The key that contains model output
     no_pred_count = 0
     matched_outputs = []
     new_data = []
 
     # for idx, sample in enumerate(tqdm(input_data)):
     for idx, sample in enumerate(input_data):
-        
+
         # If there's no model output key, skip
         if output_key not in sample:
             continue
-        
+
         if output_key not in sample:
             _prediction = ''
             no_pred_count += 1
@@ -76,7 +99,7 @@ def official_mmar_evaluation(input_data: list[dict]):
         modality = sample['modality']
         category = sample['category']
         choices = sample['choices']
-        
+
         # Get the sub-category
         subcat = sample.get('sub-category', None)
         if subcat is not None:
@@ -105,30 +128,30 @@ def official_mmar_evaluation(input_data: list[dict]):
             subcat_metrics[subcat][1] += 1
 
     # Print results:
-    print("*"*30)
+    print("*" * 30)
     print("Modality-wise Accuracy:")
     for modality in modality_metrics:
         n_correct, n_total = modality_metrics[modality]
         acc = (n_correct / n_total) * 100 if n_total > 0 else 0
         print(f"{modality} : {acc:.2f}% over {n_total} samples")
-    
-    print("*"*30)
+
+    print("*" * 30)
     print("Category-wise Accuracy:")
     for category in category_metrics:
         n_correct, n_total = category_metrics[category]
         acc = (n_correct / n_total) * 100 if n_total > 0 else 0
         print(f"{category} : {acc:.2f}% over {n_total} samples")
-    
-    print("*"*30)
+
+    print("*" * 30)
     print("Sub-category-wise Accuracy:")
     for subcat in subcat_metrics:
         n_correct, n_total = subcat_metrics[subcat]
         acc = (n_correct / n_total) * 100 if n_total > 0 else 0
         print(f"{subcat} : {acc:.2f}% over {n_total} samples")
 
-    print("*"*30)
-    print(f"Total Accuracy: {(corr/total) * 100:.2f}% over {total} samples")
-    print("*"*30)
+    print("*" * 30)
+    print(f"Total Accuracy: {(corr / total) * 100:.2f}% over {total} samples")
+    print("*" * 30)
     print(f"No prediction count: {no_pred_count}")
 
     return corr, total
@@ -142,6 +165,7 @@ def parse_args():
     parser.add_argument("--num-workers", type=int, default=4, help="DataLoader workers")
     parser.add_argument("--device", type=str, default="cuda:0", help="Device to use")
     parser.add_argument("--output-dir", type=str, default="eval_results", help="Output directory")
+    parser.add_argument("--use-cot", action="store_true", help="Enable chain-of-thought reasoning")
     parser.add_argument(
         "--options",
         nargs="+",
@@ -159,11 +183,12 @@ def main():
     print("=" * 60)
     print(f"Checkpoint: {args.ckpt}")
     print(f"Device: {args.device}")
+    print(f"Chain-of-Thought: {'Enabled' if args.use_cot else 'Disabled'}")
     print("=" * 60)
 
     # Set checkpoint path in config so from_config loads it automatically
     cfg.config.model.ckpt = args.ckpt
-    
+
     # Use appropriate model class based on model_type
     model_type = cfg.config.model.get("model_type", "salmonn")
     if model_type == "mutor":
@@ -174,11 +199,11 @@ def main():
         model = SALMONN.from_config(cfg.config.model)
     model.to(args.device)
     model.eval()
-    
+
     # Load dataset
     data_config = cfg.config.datasets
     ann_path = data_config.test_ann_path
-    
+
     print(f"Loading dataset from: {ann_path}")
     dataset = SALMONNDataset(ann_path, data_config.whisper_path)
     dataloader = DataLoader(
@@ -199,7 +224,7 @@ def main():
     # Run inference
     print("Running inference...")
     results = []
-    
+
     with torch.no_grad():
         for batch in tqdm(dataloader, desc="Evaluating"):
             # Move to device
@@ -218,36 +243,51 @@ def main():
                     else:
                         question += "."
                 choices = "\n".join([
-                    f"{choice}" 
+                    f"{choice}"
                     for letter, choice in zip(
                         string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
                     )
                 ])
-                prompt = f"<Speech><SpeechHere></Speech> {question}  Select one option from the provided choices.\n{choices}"
+
+                # Add CoT instruction if enabled
+                if args.use_cot:
+                    cot_instruction = "Think step by step and explain your reasoning before giving your final answer."
+                    prompt = f"<Speech><SpeechHere></Speech> {question}\n{choices}\n\n{cot_instruction}"
+                else:
+                    prompt = f"<Speech><SpeechHere></Speech> {question}  Select one option from the provided choices.\n{choices}"
+
                 prompts.append(cfg.config.model.prompt_template.format(prompt))
-            
+
             # Generate transcriptions
             with torch.amp.autocast('cuda', dtype=torch.float16):
                 hypotheses = model.generate(batch, cfg.config.generate, prompts=prompts)
-            
+
             references = batch["text"]
             ids = batch["id"]
-            
+
             # Store results
             for i, (ref, hyp, uid) in enumerate(zip(references, hypotheses, ids)):
                 # Clean up hypothesis (remove special tokens, extra whitespace)
                 hyp_clean = hyp.replace("</s>", "").replace("<s>", "").replace("<unk>", "").strip()
-                
+
+                # Extract final answer from CoT response if enabled
+                if args.use_cot:
+                    final_answer = extract_final_answer(hyp_clean)
+                else:
+                    final_answer = hyp_clean
+
                 results.append({
                     "id": uid,
-                    "model_prediction": hyp_clean,
+                    "model_prediction": final_answer,  # This is what gets evaluated
+                    "full_response": hyp_clean,  # Store the full CoT reasoning
                     "hyp": hyp,
                     "answer": ref,
                     "prompt": prompts[i],
                     "choices": metadata[uid]["choices"],
                     "modality": metadata[uid]["modality"],
                     "category": metadata[uid]["category"],
-                    "sub-category": metadata[uid]["sub-category"] if metadata[uid]["sub-category"] is not None else None,
+                    "sub-category": metadata[uid]["sub-category"] if metadata[uid][
+                                                                         "sub-category"] is not None else None,
                 })
 
             # Free batch GPU tensors to avoid fragmentation and OOM over many iterations
@@ -262,7 +302,7 @@ def main():
 
     # Compute metrics
     corr, total = official_mmar_evaluation(results)
-    print(f"Official MMAR Accuracy: {(corr/total) * 100:.2f}% over {total} samples")
+    print(f"Official MMAR Accuracy: {(corr / total) * 100:.2f}% over {total} samples")
 
 
 if __name__ == "__main__":
@@ -273,5 +313,6 @@ if __name__ == "__main__":
         python evaluate.py \
             --cfg-path recipes/mmar/salmonn.yaml \
             --ckpt <checkpoint_path> \
+            --use-cot 
     """
     main()

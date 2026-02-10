@@ -68,6 +68,7 @@ python evaluate_mmar.py \
     --num-workers "$SLURM_CPUS_PER_TASK" \
     --device cuda:0 \
     --output-dir "$EVAL_DIR" \
+    --use-cot \
     --options \
     model.llama_path="$SLURM_TMPDIR/pretrained/vicuna-13b-v1.1" \
     model.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
