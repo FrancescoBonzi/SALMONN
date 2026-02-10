@@ -66,7 +66,7 @@ echo "Saving evaluation results to: $EVAL_OUTPUT"
 
 mkdir -p "$EVAL_OUTPUT"
 
-python evaluate/evaluate.py \
+python evaluate.py \
     --cfg-path recipes/librispeech/salmonn.yaml \
     --ckpt "$BEST_CKPT" \
     --split test \
