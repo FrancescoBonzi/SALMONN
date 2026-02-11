@@ -106,12 +106,12 @@ def prepare_cot_youtube8m_annotations(output_dir: str):
     annotations = []
     suffix_remove = "Output the answer with <SUMMARY>, <CAPTION>, <REASONING>, and <CONCLUSION> tags."
     for item in tqdm(data):
-        filename = item["sound"].split("/")[-1].replace(".mp3", ".wav")
+        filename = item["sound"].split("/")[-1]
         if filename not in existing:
             continue
         question = item["conversations"][0]["value"].replace("<sound>", "").replace(suffix_remove, "").strip()
         annotations.append({
-            "path": str(audio_dir / filename),
+            "path": str(audio_dir / filename.replace(".mp3", ".wav")),
             "task": "reasoning",
             "answer": item["conversations"][1]["value"].strip(),
             "question": question,
