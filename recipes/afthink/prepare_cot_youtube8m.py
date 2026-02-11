@@ -6,6 +6,7 @@ os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import json
+import sys
 from pathlib import Path
 import shutil
 import tarfile
@@ -20,19 +21,26 @@ from tqdm import tqdm
 TARGET_SAMPLE_RATE = 16000  # Whisper expects 16 kHz
 
 
-def _resample_one(path: str, target_sr: int) -> Tuple[int, Optional[str]]:
-    """Resample a single file. Returns (1 if resampled else 0, error message or None)."""
+def _resample_one(wav_path: str, target_sr: int) -> Tuple[int, Optional[str]]:
+    """
+    Resample a single file. 
+    Returns (1 if processed, error message or None).
+    """
     try:
-        audio, sr = sf.read(path)
-        if sr == target_sr:
-            return (0, None)
-        if len(audio.shape) == 2:
-            audio = audio.mean(axis=1)
-        audio = librosa.resample(audio, orig_sr=sr, target_sr=target_sr)
-        sf.write(path, audio, target_sr)
+        # Use librosa.load to handle MP3s, resampling, and mono conversion in one step.
+        mp3_path = wav_path.replace(".wav", ".mp3")
+        audio, _ = librosa.load(mp3_path, sr=target_sr, mono=True)
+
+        # Write to WAV. 
+        sf.write(wav_path, audio, target_sr, subtype='PCM_16')
+        
+        # Remove original mp3
+        os.remove(mp3_path) 
+        
         return (1, None)
+
     except Exception as e:
-        return (0, f"Warning: failed to resample {path}: {e}")
+        return (0, f"Warning: failed to resample {wav_path}: {e}")
 
 
 def resample_audio_files(
@@ -40,28 +48,38 @@ def resample_audio_files(
     target_sr: int = TARGET_SAMPLE_RATE,
     n_workers: Optional[int] = None,
 ):
-    """Resample audio files to target_sr (16 kHz for Whisper). Converts stereo to mono when resampling.
-    Uses ProcessPoolExecutor for parallel I/O and CPU; n_workers defaults to min(32, CPU count)."""
+    """
+    Resample audio files to target_sr (16 kHz for Whisper).
+    Converts to mono and saves as WAV.
+    """
     n_workers = n_workers or min(32, (os.cpu_count() or 8))
-    resampled = 0
+    
+    print(f"Resampling {len(paths)} files with {n_workers} workers...", flush=True)
+    
+    resampled_count = 0
+    
     with ProcessPoolExecutor(max_workers=n_workers) as pool:
-        fut = {pool.submit(_resample_one, p, target_sr): p for p in paths}
+        # Map futures to paths
+        fut_to_path = {pool.submit(_resample_one, p, target_sr): p for p in paths}
+        
         pbar = tqdm(
-            as_completed(fut),
+            as_completed(fut_to_path),
             total=len(paths),
             desc="Resampling",
             unit="file",
-            unit_scale=True,
-            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, resampled={postfix}]",
+            file=sys.stderr,
         )
+        
         for f in pbar:
             count, err = f.result()
-            resampled += count
-            pbar.set_postfix_str(str(resampled))
+            resampled_count += count
+            
             if err:
-                tqdm.write(err)
-    if resampled:
-        print(f"Resampled {resampled} audio file(s) to {target_sr} Hz.")
+                tqdm.write(err, file=sys.stderr)
+            else:
+                pbar.set_postfix_str(f"cnt={resampled_count}")
+
+    print(f"\nProcessing complete. {resampled_count}/{len(paths)} files converted.", flush=True)
 
 
 def prepare_cot_youtube8m_annotations(output_dir: str):
@@ -88,7 +106,7 @@ def prepare_cot_youtube8m_annotations(output_dir: str):
     annotations = []
     suffix_remove = "Output the answer with <SUMMARY>, <CAPTION>, <REASONING>, and <CONCLUSION> tags."
     for item in tqdm(data):
-        filename = item["sound"].split("/")[-1]
+        filename = item["sound"].split("/")[-1].replace(".mp3", ".wav")
         if filename not in existing:
             continue
         question = item["conversations"][0]["value"].replace("<sound>", "").replace(suffix_remove, "").strip()
@@ -118,9 +136,9 @@ def prepare_cot_youtube8m_annotations(output_dir: str):
     print(f"Saved {len(test_annotations)} samples to {test_ann_path}")
 
     # Remove YouTube8M.json
-    if json_path.exists():
-        json_path.unlink()
-        print("Removed", json_path.name)
+    #if json_path.exists():
+    #    json_path.unlink()
+    #    print("Removed", json_path.name)
 
     return train_annotations, test_annotations
 
