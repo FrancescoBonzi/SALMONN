@@ -1,0 +1,165 @@
+#!/bin/bash
+#SBATCH --time=12:0:0
+#SBATCH --account=aip-csubakan
+#SBATCH --cpus-per-task=48
+#SBATCH --mem=488G
+#SBATCH --ntasks=1
+#SBATCH --gpus-per-node=h100:4
+#SBATCH --nodes=1
+#SBATCH --array=0-0
+
+# Define seeds array
+seeds=(42)
+
+# Get the seed for this job array index
+seed=${seeds[$SLURM_ARRAY_TASK_ID]}
+
+# Define config variables
+model_type="salmonn"
+ckpt_path="pretrained/salmonn_v1.pth"
+ckpt_type="finetuned"
+prompt_type="afthink"
+eval_filename="${model_type}_13B_${ckpt_type}_${prompt_type}prompt_seed${seed}.json"
+
+# Copy data to SLURM_TMPDIR for fast I/O
+echo "Copying data to SLURM_TMPDIR..."
+
+# Copy YouTube8M dataset
+mkdir -p "$SLURM_TMPDIR/data/YouTube8M/"
+cp -r "data/YouTube8M/" "$SLURM_TMPDIR/data/" &
+COPY_YOUTUBE8M_DATA_PID=$!
+
+# Copy MMAR dataset
+mkdir -p "$SLURM_TMPDIR/data/MMAR/"
+cp -r "data/MMAR/" "$SLURM_TMPDIR/data/" &
+COPY_MMAR_DATA_PID=$!
+
+# Copy MMAU dataset
+mkdir -p "$SLURM_TMPDIR/data/MMAU/"
+cp -r "data/MMAU/" "$SLURM_TMPDIR/data/" &
+COPY_MMAU_DATA_PID=$!
+
+# Wait for all copies to finish
+wait $COPY_YOUTUBE8M_DATA_PID $COPY_MMAR_DATA_PID $COPY_MMAU_DATA_PID
+echo "Data copy complete!"
+
+# Copy pretrained models
+mkdir -p "$SLURM_TMPDIR/pretrained"
+cp -r "pretrained/whisper-large-v2" "$SLURM_TMPDIR/pretrained/" &
+COPY_WHISPER_PID=$!
+
+cp -r "pretrained/vicuna-13b-v1.1" "$SLURM_TMPDIR/pretrained/" &
+COPY_VICUNA_PID=$!
+
+cp "pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" "$SLURM_TMPDIR/pretrained/" &
+COPY_BEATS_PID=$!
+
+cp "$ckpt_path" "$SLURM_TMPDIR/pretrained/ckpt.pth" &
+COPY_SALMONN_PID=$!
+
+# Wait for all copies to finish
+wait $COPY_WHISPER_PID $COPY_VICUNA_PID $COPY_BEATS_PID $COPY_SALMONN_PID
+echo "Pretrained models copy complete!"
+
+# Update annotation paths to point to SLURM_TMPDIR
+# Replace any absolute path ending with /data/YouTube8M
+echo "Updating annotation paths..."
+sed -i "s|[^\"]*data/YouTube8M|$SLURM_TMPDIR/data/YouTube8M|g" "$SLURM_TMPDIR/data/YouTube8M/annotations/"*.json
+sed -i "s|[^\"]*data/MMAR|$SLURM_TMPDIR/data/MMAR|g" "$SLURM_TMPDIR/data/MMAR/annotations/"*.json
+sed -i "s|[^\"]*data/MMAU|$SLURM_TMPDIR/data/MMAU|g" "$SLURM_TMPDIR/data/MMAU/annotations/"*.json
+
+# Activate environment
+module load StdEnv/2023 cuda/12.2
+module load httpproxy
+source .venv/bin/activate
+
+# Run training
+echo "Starting training..."
+
+torchrun --nproc_per_node=4 train.py --cfg-path recipes/afthink/$model_type.yaml \
+    --options \
+    model.llama_path="$SLURM_TMPDIR/pretrained/vicuna-13b-v1.1" \
+    model.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
+    model.beats_path="$SLURM_TMPDIR/pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" \
+    model.ckpt="$SLURM_TMPDIR/pretrained/ckpt.pth" \
+    datasets.train_ann_path="$SLURM_TMPDIR/data/YouTube8M/annotations/train_youtube8m.json" \
+    datasets.valid_ann_path="$SLURM_TMPDIR/data/YouTube8M/annotations/test_youtube8m.json" \
+    datasets.test_ann_path="$SLURM_TMPDIR/data/YouTube8M/annotations/test_youtube8m.json" \
+    datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
+    run.seed="$seed" \
+    run.output_dir="outputs/afthink_youtube8m/$model_type/$seed" \
+    run.num_workers="$SLURM_CPUS_PER_TASK"
+
+echo "Training finished at $(date)"
+
+# Run evaluation on the best checkpoint
+echo "Starting evaluation..."
+
+# Find the output directory
+OUTPUT_DIR=$(ls -dt outputs/afthink_youtube8m/$model_type/$seed/* | head -n 1)
+BEST_CKPT="${OUTPUT_DIR}/checkpoint_best.pth"
+
+echo "Using checkpoint: $BEST_CKPT"
+
+echo "Evaluating YouTube8M..."
+python evaluate_afthink.py \
+    --cfg-path recipes/afthink/$model_type.yaml \
+    --ckpt "$BEST_CKPT" \
+    --split test \
+    --batch-size 4 \
+    --num-workers "$SLURM_CPUS_PER_TASK" \
+    --device cuda:0 \
+    --output-file "outputs/afthink_youtube8m/$eval_filename" \
+    --options \
+    model.llama_path="$SLURM_TMPDIR/pretrained/vicuna-13b-v1.1" \
+    model.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
+    model.beats_path="$SLURM_TMPDIR/pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" \
+    datasets.test_ann_path="$SLURM_TMPDIR/data/YouTube8M/annotations/test_youtube8m.json" \
+    datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
+    run.seed="$seed" \
+    run.num_workers="$SLURM_CPUS_PER_TASK"
+
+echo "YouTube8M evaluation finished at $(date)"
+
+# Run evaluation on the best checkpoint
+echo "Evaluating MMAU..."
+
+python evaluate_mmau.py \
+    --cfg-path recipes/afthink/$model_type.yaml \
+    --ckpt "$BEST_CKPT" \
+    --batch-size 4 \
+    --num-workers "$SLURM_CPUS_PER_TASK" \
+    --device cuda:0 \
+    --output-file "outputs/mmau/$eval_filename" \
+    --prompt-type "$prompt_type" \
+    --options \
+    model.llama_path="$SLURM_TMPDIR/pretrained/vicuna-13b-v1.1" \
+    model.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
+    model.beats_path="$SLURM_TMPDIR/pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" \
+    datasets.test_ann_path="$SLURM_TMPDIR/data/MMAU/annotations/test_mmau.json" \
+    datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
+    run.seed="$seed" \
+    run.num_workers="$SLURM_CPUS_PER_TASK"
+
+echo "MMAU evaluation finished at $(date)"
+
+echo "Evaluating MMAR..."
+python evaluate_mmar.py \
+    --cfg-path recipes/afthink/$model_type.yaml \
+    --ckpt "$BEST_CKPT" \
+    --batch-size 4 \
+    --num-workers "$SLURM_CPUS_PER_TASK" \
+    --device cuda:0 \
+    --output-file "outputs/mmar/$eval_filename" \
+    --prompt-type "$prompt_type" \
+    --options \
+    model.llama_path="$SLURM_TMPDIR/pretrained/vicuna-13b-v1.1" \
+    model.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
+    model.beats_path="$SLURM_TMPDIR/pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" \
+    datasets.test_ann_path="$SLURM_TMPDIR/data/MMAR/annotations/test_mmar.json" \
+    datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
+    run.seed="$seed" \
+    run.num_workers="$SLURM_CPUS_PER_TASK"
+
+echo "MMAR evaluation finished at $(date)"
+echo "Job finished at $(date)"
