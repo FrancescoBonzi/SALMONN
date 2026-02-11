@@ -3,7 +3,8 @@ import json
 from pathlib import Path
 import shutil
 import tarfile
-from typing import List
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from typing import List, Optional, Tuple
 import urllib.request
 import random
 import soundfile as sf
@@ -13,21 +14,37 @@ from tqdm import tqdm
 TARGET_SAMPLE_RATE = 16000  # Whisper expects 16 kHz
 
 
-def resample_audio_files(paths: List[str], target_sr: int = TARGET_SAMPLE_RATE):
-    """Resample audio files to target_sr (16 kHz for Whisper). Converts stereo to mono when resampling."""
+def _resample_one(path: str, target_sr: int) -> Tuple[int, Optional[str]]:
+    """Resample a single file. Returns (1 if resampled else 0, error message or None)."""
+    try:
+        audio, sr = sf.read(path)
+        if sr == target_sr:
+            return (0, None)
+        if len(audio.shape) == 2:
+            audio = audio.mean(axis=1)
+        audio = librosa.resample(audio, orig_sr=sr, target_sr=target_sr)
+        sf.write(path, audio, target_sr)
+        return (1, None)
+    except Exception as e:
+        return (0, f"Warning: failed to resample {path}: {e}")
+
+
+def resample_audio_files(
+    paths: List[str],
+    target_sr: int = TARGET_SAMPLE_RATE,
+    n_workers: Optional[int] = None,
+):
+    """Resample audio files to target_sr (16 kHz for Whisper). Converts stereo to mono when resampling.
+    Uses ProcessPoolExecutor for parallel I/O and CPU; n_workers defaults to min(32, CPU count)."""
+    n_workers = n_workers or min(32, (os.cpu_count() or 8))
     resampled = 0
-    for path in tqdm(paths):
-        try:
-            audio, sr = sf.read(path)
-            if sr == target_sr:
-                continue
-            if len(audio.shape) == 2:
-                audio = audio.mean(axis=1)
-            audio = librosa.resample(audio, orig_sr=sr, target_sr=target_sr)
-            sf.write(path, audio, target_sr)
-            resampled += 1
-        except Exception as e:
-            print(f"Warning: failed to resample {path}: {e}")
+    with ProcessPoolExecutor(max_workers=n_workers) as pool:
+        fut = {pool.submit(_resample_one, p, target_sr): p for p in paths}
+        for f in tqdm(as_completed(fut), total=len(paths), desc="Resampling"):
+            count, err = f.result()
+            resampled += count
+            if err:
+                print(err)
     if resampled:
         print(f"Resampled {resampled} audio file(s) to {target_sr} Hz.")
 
