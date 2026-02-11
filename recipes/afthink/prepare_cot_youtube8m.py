@@ -1,85 +1,11 @@
 import os
-
-# Limit BLAS/OMP threads to avoid "pthread_create failed" when using ProcessPoolExecutor.
-# Each worker already runs in parallel; multithreading inside workers causes thread explosion.
-os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
-os.environ.setdefault("OMP_NUM_THREADS", "1")
-
 import json
-import sys
 from pathlib import Path
 import shutil
 import tarfile
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from typing import List, Optional, Tuple
 import urllib.request
 import random
-import soundfile as sf
-import librosa
 from tqdm import tqdm
-
-TARGET_SAMPLE_RATE = 16000  # Whisper expects 16 kHz
-
-
-def _resample_one(wav_path: str, target_sr: int) -> Tuple[int, Optional[str]]:
-    """
-    Resample a single file. 
-    Returns (1 if processed, error message or None).
-    """
-    try:
-        # Use librosa.load to handle MP3s, resampling, and mono conversion in one step.
-        mp3_path = wav_path.replace(".wav", ".mp3")
-        audio, _ = librosa.load(mp3_path, sr=target_sr, mono=True)
-
-        # Write to WAV. 
-        sf.write(wav_path, audio, target_sr, subtype='PCM_16')
-        
-        # Remove original mp3
-        os.remove(mp3_path) 
-        
-        return (1, None)
-
-    except Exception as e:
-        return (0, f"Warning: failed to resample {wav_path}: {e}")
-
-
-def resample_audio_files(
-    paths: List[str],
-    target_sr: int = TARGET_SAMPLE_RATE,
-    n_workers: Optional[int] = None,
-):
-    """
-    Resample audio files to target_sr (16 kHz for Whisper).
-    Converts to mono and saves as WAV.
-    """
-    n_workers = n_workers or min(32, (os.cpu_count() or 8))
-    
-    print(f"Resampling {len(paths)} files with {n_workers} workers...", flush=True)
-    
-    resampled_count = 0
-    
-    with ProcessPoolExecutor(max_workers=n_workers) as pool:
-        # Map futures to paths
-        fut_to_path = {pool.submit(_resample_one, p, target_sr): p for p in paths}
-        
-        pbar = tqdm(
-            as_completed(fut_to_path),
-            total=len(paths),
-            desc="Resampling",
-            unit="file",
-            file=sys.stderr,
-        )
-        
-        for f in pbar:
-            count, err = f.result()
-            resampled_count += count
-            
-            if err:
-                tqdm.write(err, file=sys.stderr)
-            else:
-                pbar.set_postfix_str(f"cnt={resampled_count}")
-
-    print(f"\nProcessing complete. {resampled_count}/{len(paths)} files converted.", flush=True)
 
 
 def prepare_cot_youtube8m_annotations(output_dir: str):
@@ -135,13 +61,6 @@ def prepare_cot_youtube8m_annotations(output_dir: str):
         json.dump({"annotation": test_annotations}, f, indent=2)
     print(f"Saved {len(test_annotations)} samples to {test_ann_path}")
 
-    # Remove YouTube8M.json
-    #if json_path.exists():
-    #    json_path.unlink()
-    #    print("Removed", json_path.name)
-
-    return train_annotations, test_annotations
-
 
 if __name__ == "__main__":
     script_dir = Path(__file__).resolve().parent
@@ -150,23 +69,37 @@ if __name__ == "__main__":
     archive_path = data_dir / "AFThink.tar.gz"
 
     # Extract AFThink.tar.gz
-    print("Extracting AFThink.tar.gz...")
-    with tarfile.open(archive_path, "r:gz") as tar:
-        tar.extractall(data_dir)
+    if not (data_dir / "audio_files").exists():
+        print("Extracting AFThink.tar.gz...")
+        with tarfile.open(archive_path, "r:gz") as tar:
+            tar.extractall(data_dir)
 
-    # Rename audio_files to audio_files/
-    audio_files_dir = data_dir / "AFThink"
-    if audio_files_dir.exists():
-        shutil.move(str(audio_files_dir), str(data_dir / "audio_files"))
+        # Rename audio_files to audio_files/
+        audio_files_dir = data_dir / "AFThink"
+        if audio_files_dir.exists():
+            shutil.move(str(audio_files_dir), str(data_dir / "audio_files"))
+    else:
+        print("Audio files already extracted")
 
     print("Generating annotations...")
-    train_annotations, test_annotations = prepare_cot_youtube8m_annotations(str(data_dir))
+    prepare_cot_youtube8m_annotations(str(data_dir))
 
-    print("Resampling train audio files to 16 kHz for Whisper...")
-    resample_audio_files([ann["path"] for ann in train_annotations])
-    print("Resampling test audio files to 16 kHz for Whisper...")
-    resample_audio_files([ann["path"] for ann in test_annotations])
+    print("TO-DO: Resample audio from 48kHz (.mp3) to 16 kHz (.wav) for Whisper")
+    print("Recommended to use the following command:")
+    print("cd data/YouTube8M/audio_files")
+    print("find . -maxdepth 1 -name \"*.mp3\" -print0 | parallel -0 -j $SLURM_CPUS_PER_TASK ffmpeg -i {} -ar 16000 -ac 1 -c:a pcm_s16le {.}.wav")
+    print("Optional: Remove original mp3 files with the following command:")
+    print("rm *.mp3")
+    print("WARNING: Resample the audio files on a COMPUTE NODE!")
+    print("Note: Estimated time to resample ~300k audio files is 2 hours on a compute node with 48 CPUs.")
+    print("Note: Estimated disk space savings is 100GB.")
 
+    # Remove YouTube8M.json
+    #if json_path.exists():
+    #    json_path.unlink()
+    #    print("Removed", json_path.name)
+
+    # Remove AFThink.tar.gz
     #if archive_path.exists():
     #    archive_path.unlink()
     #    print("Removed", archive_path.name)
