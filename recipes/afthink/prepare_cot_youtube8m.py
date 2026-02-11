@@ -1,4 +1,10 @@
 import os
+
+# Limit BLAS/OMP threads to avoid "pthread_create failed" when using ProcessPoolExecutor.
+# Each worker already runs in parallel; multithreading inside workers causes thread explosion.
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+
 import json
 from pathlib import Path
 import shutil
@@ -40,11 +46,20 @@ def resample_audio_files(
     resampled = 0
     with ProcessPoolExecutor(max_workers=n_workers) as pool:
         fut = {pool.submit(_resample_one, p, target_sr): p for p in paths}
-        for f in tqdm(as_completed(fut), total=len(paths), desc="Resampling"):
+        pbar = tqdm(
+            as_completed(fut),
+            total=len(paths),
+            desc="Resampling",
+            unit="file",
+            unit_scale=True,
+            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, resampled={postfix}]",
+        )
+        for f in pbar:
             count, err = f.result()
             resampled += count
+            pbar.set_postfix_str(str(resampled))
             if err:
-                print(err)
+                tqdm.write(err)
     if resampled:
         print(f"Resampled {resampled} audio file(s) to {target_sr} Hz.")
 
