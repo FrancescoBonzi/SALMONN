@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import shutil
 import tarfile
+from typing import List
 import urllib.request
 import random
 import soundfile as sf
@@ -13,13 +14,10 @@ TARGET_SAMPLE_RATE = 16000  # Whisper expects 16 kHz
 AUDIO_EXTENSIONS = {".wav", ".flac", ".ogg"}
 
 
-def resample_audio_dir(root_dir: Path, target_sr: int = TARGET_SAMPLE_RATE):
-    """Resample all audio files under root_dir to target_sr (16 kHz for Whisper)."""
-    root_dir = Path(root_dir)
+def resample_audio_files(paths: List[str], target_sr: int = TARGET_SAMPLE_RATE):
+    """Resample audio files to target_sr (16 kHz for Whisper). Converts stereo to mono when resampling."""
     resampled = 0
-    for path in root_dir.rglob("*"):
-        if path.suffix.lower() not in AUDIO_EXTENSIONS or not path.is_file():
-            continue
+    for path in paths:
         try:
             audio, sr = sf.read(path)
             if sr == target_sr:
@@ -88,6 +86,13 @@ def prepare_cot_youtube8m_annotations(output_dir: str):
         json.dump({"annotation": test_annotations}, f, indent=2)
     print(f"Saved {len(test_annotations)} samples to {test_ann_path}")
 
+    # Remove YouTube8M.json
+    if json_path.exists():
+        json_path.unlink()
+        print("Removed", json_path.name)
+
+    return train_annotations, test_annotations
+
 
 if __name__ == "__main__":
     script_dir = Path(__file__).resolve().parent
@@ -105,7 +110,13 @@ if __name__ == "__main__":
     if audio_files_dir.exists():
         shutil.move(str(audio_files_dir), str(data_dir / "audio_files"))
 
-    prepare_cot_youtube8m_annotations(str(data_dir))
+    print("Generating annotations...")
+    train_annotations, test_annotations = prepare_cot_youtube8m_annotations(str(data_dir))
+
+    print("Resampling train audio files to 16 kHz for Whisper...")
+    resample_audio_files([ann["path"] for ann in train_annotations])
+    print("Resampling test audio files to 16 kHz for Whisper...")
+    resample_audio_files([ann["path"] for ann in test_annotations])
 
     #if archive_path.exists():
     #    archive_path.unlink()
