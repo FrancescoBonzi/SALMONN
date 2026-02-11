@@ -11,13 +11,12 @@ import librosa
 from tqdm import tqdm
 
 TARGET_SAMPLE_RATE = 16000  # Whisper expects 16 kHz
-AUDIO_EXTENSIONS = {".wav", ".flac", ".ogg"}
 
 
 def resample_audio_files(paths: List[str], target_sr: int = TARGET_SAMPLE_RATE):
     """Resample audio files to target_sr (16 kHz for Whisper). Converts stereo to mono when resampling."""
     resampled = 0
-    for path in paths:
+    for path in tqdm(paths):
         try:
             audio, sr = sf.read(path)
             if sr == target_sr:
