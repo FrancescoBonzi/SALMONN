@@ -95,6 +95,11 @@ def main():
     )
 
     metadata_list = json.load(open(ann_path, "r"))["annotation"]
+
+    # Extract choices from question
+    for item in metadata_list:
+        item["choices"] = [m[1].strip() for m in re.findall(r"\(([A-Z])\) (.*?)(?:\.(?=\s|$)|$)", item["question"], re.MULTILINE)]
+
     metadata = {
         item["path"]: {k: v for k, v in item.items() if k != "path"}
         for item in metadata_list
