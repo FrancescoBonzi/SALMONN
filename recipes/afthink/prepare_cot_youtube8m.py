@@ -89,10 +89,11 @@ if __name__ == "__main__":
     print("cd data/YouTube8M/audio_files")
     print("find . -maxdepth 1 -name \"*.mp3\" -print0 | parallel -0 -j $SLURM_CPUS_PER_TASK ffmpeg -i {} -ar 16000 -ac 1 -c:a pcm_s16le {.}.wav")
     print("Optional: Remove original mp3 files with the following command:")
-    print("rm *.mp3")
+    print("find . -name \"*.mp3\" | xargs -I \{\} rm -f \"\{\}\"")
     print("WARNING: Resample the audio files on a COMPUTE NODE!")
-    print("Note: Estimated time to resample ~300k audio files is 2 hours on a compute node with 48 CPUs.")
+    print("Note: Estimated time to resample ~300k audio files is 4-5 hours on a compute node with 48 CPUs.")
     print("Note: Estimated disk space savings is 100GB.")
+    print("Note: Keep in mind that you can't have more than 1000K audio files in your cluster allocation.")
 
     # Remove YouTube8M.json
     #if json_path.exists():
