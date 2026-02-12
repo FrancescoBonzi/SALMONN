@@ -665,6 +665,7 @@ class MutorSALMONN(SALMONN):
         
         batch_size = to_regress_tokens.input_ids.shape[0]
         device = to_regress_tokens.input_ids.device
+        double_sequence_len = to_regress_tokens.input_ids.shape[1] * 2
 
         # Sample offset d uniformly (offset = d - 1 in the code)
         offset = np.random.randint(self.min_offset, self.max_offset + 1)           
@@ -683,15 +684,13 @@ class MutorSALMONN(SALMONN):
             
             # INTERLEAVE: Stack registers and answer tokens, then flatten
             # Result: [r, x1, r, x2, r, x3, ...]
-            interleaved_answer = torch.stack([reg_tokens, answer_part_tensor], dim=1).flatten(0)
+            interleaved_answer = torch.stack([answer_part_tensor, reg_tokens], dim=1).flatten(0)
             double_attention_mask = attention_mask.repeat_interleave(2)
-            double_sequence_len = double_attention_mask.shape[0]
 
             # Track indices of register tokens and real tokens
-            reg_token_indices = torch.arange(0, len(interleaved_answer), 2, device=device)
-            total_len = interleaved_answer.size(0)
-            all_indices = torch.arange(total_len, device=device)
-            real_token_mask = torch.ones(total_len, dtype=bool, device=device)
+            reg_token_indices = torch.arange(1, len(interleaved_answer), 2, device=device)
+            all_indices = torch.arange(double_sequence_len, device=device)
+            real_token_mask = torch.ones(double_sequence_len, dtype=bool, device=device)
             real_token_mask[reg_token_indices] = False
             real_token_indices = all_indices[real_token_mask]
 
@@ -702,7 +701,7 @@ class MutorSALMONN(SALMONN):
             # Register tokens cannot attend to other register tokens
             mask_auxiliary[:, ~real_token_mask] = 0.0
             # Restore the diagonal of the mask
-            mask_auxiliary.diagonal(dim1=0, dim2=1).fill_(1.0)
+            mask_auxiliary.diagonal(dim1=0, dim2=1).copy_(double_attention_mask)
 
             input_ids.append(interleaved_answer)
             attention_mask_4d.append(mask_auxiliary)
@@ -720,17 +719,14 @@ class MutorSALMONN(SALMONN):
         ### Construct labels accordingly to the interleaved sequences ###
 
         targets = input_ids.clone().roll(-2, dims=1)
-        targets[targets == self.llama_tokenizer.pad_token_id] = -100
-        targets[:, -1] = -100
         to_regress_position_ids = torch.arange(input_ids.shape[1] // 2, device=input_ids.device).repeat_interleave(2).unsqueeze(0).repeat(batch_size, 1)
 
-        reg_position_ids_batch = []
         for i in range(batch_size):
             reg_indices = reg_token_indices_batch[i]
 
             # Compute target indices for each register
             j_tensor = torch.arange(len(reg_indices), device=device)
-            target_indices = reg_indices + 1 + 2 * offset  # Target is offset steps ahead
+            target_indices = reg_indices - 1 + 2 * offset  # Target is offset steps ahead
             reg_positions = j_tensor + offset - 1  # Position IDs for registers
 
             # Mask: target index must be in bounds
@@ -740,17 +736,13 @@ class MutorSALMONN(SALMONN):
             targets[i, reg_indices[valid_targets_mask]] = input_ids[i, target_indices[valid_targets_mask]]
             targets[i, reg_indices[~valid_targets_mask]] = -100  # Mask out-of-bounds
 
-            # Store position IDs for registers
-            last_valid_pos = len(real_token_indices_batch[i]) - 1
-            reg_position_ids = torch.where(
-                valid_targets_mask,
-                reg_positions,
-                torch.full_like(reg_positions, last_valid_pos)
-            )
-            reg_position_ids_batch.append(reg_position_ids)
-
-            # Update position IDs for registers
-            to_regress_position_ids[i, reg_token_indices_batch[i]] = reg_position_ids_batch[i]
+            # Add position IDs for registers
+            last_valid_pos = to_regress_position_ids.shape[1] // 2 - 1
+            to_regress_position_ids[i, reg_indices[valid_targets_mask]] = reg_positions[valid_targets_mask]
+            to_regress_position_ids[i, reg_indices[~valid_targets_mask]] = last_valid_pos
+        
+        targets[targets == self.llama_tokenizer.pad_token_id] = -100 # Mask pad tokens
+        targets[:, -2:] = -100 # Mask last two tokens (due to the shift of the interleaved sequences)
 
         ### Construct inputs + targets for LLM ###
 
