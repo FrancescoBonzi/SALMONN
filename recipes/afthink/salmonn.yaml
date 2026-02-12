@@ -52,7 +52,7 @@ run:
 
   log_freq: 10
   epoch_based: False
-  iters_per_epoch: 40000
+  iters_per_epoch: 4000
   accum_grad_iters: 8
   batch_size_train: 4
   batch_size_eval: 8
@@ -65,7 +65,7 @@ run:
   dist_url: "env://"
 
   optims:
-    max_epoch: 1
+    max_epoch: 10 # 10 × 4000 = 40000 iters = 1 full pass over 160k items
     warmup_steps: 1000
     warmup_start_lr: 1e-6
     init_lr: 2e-5
