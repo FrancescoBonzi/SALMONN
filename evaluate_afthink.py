@@ -139,6 +139,8 @@ def main():
                     conclusion_hypothesis = conclusion_hypothesis_tags.group(1).strip()
                 else:
                     conclusion_hypothesis = hyp_clean
+                # Remove letter choice prefix from conclusion (e.g. "(A) ", "(B) ") - only at the beginning
+                conclusion_hypothesis = re.sub(r"^\([A-Z]\)\s*", "", conclusion_hypothesis).strip()
 
                 # Extract the CONCLUSION tag from the reference
                 conclusion_reference_tags = re.search(r"<CONCLUSION>(.*?)</CONCLUSION>", ref)
@@ -146,6 +148,8 @@ def main():
                     conclusion_reference = conclusion_reference_tags.group(1).strip()
                 else:
                     conclusion_reference = ref
+                # Remove letter choice prefix from conclusion (e.g. "(A) ", "(B) ") - only at the beginning
+                conclusion_reference = re.sub(r"^\([A-Z]\)\s*", "", conclusion_reference).strip()
                 
                 all_conclusions_hyps.append(conclusion_hypothesis)
                 all_conclusions_refs.append(conclusion_reference)
