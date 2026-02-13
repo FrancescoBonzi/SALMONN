@@ -127,10 +127,9 @@ def main():
             with torch.amp.autocast('cuda', dtype=torch.float16):
                 hypotheses = model.generate(batch, cfg.config.generate, prompts=prompts)
             
-            path = batch["path"]
-            references = batch["answer"]
+            references = batch["text"]
             ids = batch["id"]
-            for ref, hyp, uid, path in zip(references, hypotheses, ids, path):
+            for ref, hyp, uid in zip(references, hypotheses, ids):
                 # Clean up hypothesis (remove special tokens, extra whitespace)
                 hyp_clean = hyp.replace("</s>", "").replace("<s>", "").replace("<unk>", "").strip()
 
@@ -154,7 +153,6 @@ def main():
                 all_hyps.append(hyp_clean)
                 all_results.append({
                     "id": uid,
-                    "path": path,
                     "conclusion_hypothesis": conclusion_hypothesis.lower(),
                     "conclusion_reference": conclusion_reference.lower(),
                     "reference": ref,
@@ -220,7 +218,6 @@ def main():
     print("=" * 60)
     for i, res in enumerate(all_results[:5]):
         print(f"\n[{i+1}] ID: {res['id']}")
-        print(f"    PATH: {res['path']}")
         print(f"    CONCLUSION HYP: {res['conclusion_hypothesis']}")
         print(f"    CONCLUSION REF: {res['conclusion_reference']}")
         print(f"    REF: {res['reference']}")
