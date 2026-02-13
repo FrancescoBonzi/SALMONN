@@ -532,7 +532,7 @@ class SALMONN(nn.Module):
 
 
 class MutorSALMONN(SALMONN):
-    def __init__(self, min_offset=1, max_offset=2, alpha=0.1, *args, **kwargs):
+    def __init__(self, min_offset=1, max_offset=4, alpha=0.1, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.min_offset = min_offset
         self.max_offset = max_offset
@@ -547,7 +547,7 @@ class MutorSALMONN(SALMONN):
     def from_config(cls, config):
         # Get MuToR-specific params
         min_offset = config.get("mutor_min_offset", 1)
-        max_offset = config.get("mutor_max_offset", 2)
+        max_offset = config.get("mutor_max_offset", 4)
         alpha = config.get("mutor_alpha", 0.1)
         
         # Get all base SALMONN params
@@ -622,7 +622,6 @@ class MutorSALMONN(SALMONN):
         if not self.training:
             return super().forward(samples, verbose)
 
-        # detect whether there are multi tasks in this batch
         task = list(set(samples["task"]))
         if len(task) > 1 or "QA" in task:
             self.multi_prompt = True
@@ -636,6 +635,13 @@ class MutorSALMONN(SALMONN):
             else:
                 prompt = random.choice(self.prompt_dict[samples["task"][0]])
 
+            # For reasoning tasks, concatenate question + prompt
+            if "question" in samples and any(samples["question"]):
+                if not self.multi_prompt:
+                    prompt = [prompt] * len(samples["question"])
+                    self.multi_prompt = True
+                prompt = [q + " " + p for p, q in zip(prompt, samples["question"])]
+
         # use speech/audio encoder to encode speech/audio
         spectrogram = samples["spectrogram"]
         raw_wav = samples.get("raw_wav", None)
@@ -643,10 +649,10 @@ class MutorSALMONN(SALMONN):
 
         speech_embeds, speech_atts = self.encode_speech(spectrogram, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask)
 
-        # wrap speech_embeds with prompts
+        # wrap speech_embeds with prompts (includes question for reasoning tasks)
         if self.prompt_dict:
             speech_embeds, speech_atts = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt)
-        
+
         # prepare inputs for LLM (use answer for reasoning tasks, text for ASR)
         if "answer" in samples and any(samples["answer"]):
             text = [t + self.end_sym for t in samples["answer"]]
@@ -683,7 +689,7 @@ class MutorSALMONN(SALMONN):
             reg_tokens = torch.full_like(answer_part_tensor, self.llama_tokenizer.register_token_id)
             
             # INTERLEAVE: Stack registers and answer tokens, then flatten
-            # Result: [r, x1, r, x2, r, x3, ...]
+            # Result: [x1, r, x2, r, x3, r, ...]
             interleaved_answer = torch.stack([answer_part_tensor, reg_tokens], dim=1).flatten(0)
             double_attention_mask = attention_mask.repeat_interleave(2)
 
@@ -766,7 +772,7 @@ class MutorSALMONN(SALMONN):
 
         # Convert to additive mask format (1 → 0.0, 0 → -inf)
         mask_4d = 1.0 - mask_4d
-        mask_4d = mask_4d.masked_fill(mask_4d > 0.5, torch.tensor(torch.finfo(mask_4d.dtype).min))
+        mask_4d = mask_4d.masked_fill(mask_4d > 0.5, float(torch.finfo(mask_4d.dtype).min))
 
         # Position IDs for registers
         position_ids = torch.cat([
