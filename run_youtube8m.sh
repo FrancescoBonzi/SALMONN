@@ -101,25 +101,25 @@ BEST_CKPT="${OUTPUT_DIR}/checkpoint_best.pth"
 
 echo "Using checkpoint: $BEST_CKPT"
 
-echo "Evaluating YouTube8M..."
-python evaluate_afthink.py \
-    --cfg-path recipes/afthink/$model_type.yaml \
-    --ckpt "$BEST_CKPT" \
-    --split test \
-    --batch-size 4 \
-    --num-workers "$SLURM_CPUS_PER_TASK" \
-    --device cuda:0 \
-    --output-file "outputs/afthink_youtube8m/$eval_filename" \
-    --options \
-    model.llama_path="$SLURM_TMPDIR/pretrained/vicuna-13b-v1.1" \
-    model.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
-    model.beats_path="$SLURM_TMPDIR/pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" \
-    datasets.test_ann_path="$SLURM_TMPDIR/data/YouTube8M/annotations/test_youtube8m.json" \
-    datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
-    run.seed="$seed" \
-    run.num_workers="$SLURM_CPUS_PER_TASK"
+# echo "Evaluating YouTube8M..."
+# python evaluate_afthink.py \
+#     --cfg-path recipes/afthink/$model_type.yaml \
+#     --ckpt "$BEST_CKPT" \
+#     --split test \
+#     --batch-size 4 \
+#     --num-workers "$SLURM_CPUS_PER_TASK" \
+#     --device cuda:0 \
+#     --output-file "outputs/afthink_youtube8m/$eval_filename" \
+#     --options \
+#     model.llama_path="$SLURM_TMPDIR/pretrained/vicuna-13b-v1.1" \
+#     model.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
+#     model.beats_path="$SLURM_TMPDIR/pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" \
+#     datasets.test_ann_path="$SLURM_TMPDIR/data/YouTube8M/annotations/test_youtube8m.json" \
+#     datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
+#     run.seed="$seed" \
+#     run.num_workers="$SLURM_CPUS_PER_TASK"
 
-echo "YouTube8M evaluation finished at $(date)"
+# echo "YouTube8M evaluation finished at $(date)"
 
 # Run evaluation on the best checkpoint
 echo "Evaluating MMAU..."
