@@ -288,7 +288,7 @@ class SALMONN(nn.Module):
                     p_after.append(a)
                 
                 p_before_tokens = self.llama_tokenizer(
-                    p_before, return_tensors="pt", add_special_tokens=False
+                    p_before, return_tensors="pt", padding="longest", add_special_tokens=False
                 ).to(embeds.device)
                 p_before_embeds = self.llama_model.model.embed_tokens(p_before_tokens.input_ids) if not self.lora else self.llama_model.model.model.embed_tokens(p_before_tokens.input_ids)
 
@@ -305,7 +305,7 @@ class SALMONN(nn.Module):
                 p_before, p_after = prompt.split("<SpeechHere>")
 
                 p_before_tokens = self.llama_tokenizer(
-                    p_before, return_tensors="pt", add_special_tokens=False
+                    p_before, return_tensors="pt", padding="longest", add_special_tokens=False
                 ).to(embeds.device)
                 p_after_tokens = self.llama_tokenizer(
                     p_after, return_tensors="pt", add_special_tokens=False

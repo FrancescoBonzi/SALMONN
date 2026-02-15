@@ -219,22 +219,17 @@ def cot_prompt_template(batch, metadata, cfg):
     for i in range(len(batch["id"])):
         id = batch["id"][i]
         question = metadata[id]["question"]
-
-        # Add proper punctuation to question
         if not question.endswith("?") and not question.endswith("."):
             if question.startswith(("Which", "What", "Who", "When", "Where", "Why", "How", "Are", "Is")):
                 question += "?"
             else:
                 question += "."
-
-        # Format choices with letters
         choices = "\n".join([
             f"({letter}) {choice}"
             for letter, choice in zip(
                 string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
             )
         ])
-
         # CoT prompt with explicit reasoning instructions
         prompt = f"Listen to the audio carefully and answer the following question. Question: {question} \nOptions: {choices} \nInstructions: First, analyze what you hear in the audio using the <ANALYSIS> tag. Then, describe relevant audio characteristics using the <OBSERVATION> tag. Next, reason through each option step-by-step using the <REASONING> tag. Finally, provide ONLY your selected answer (the letter and option text) in the <CONCLUSION> tag.\nUSER: <Speech><SpeechHere></Speech>\nASSISTANT:"
         prompts.append(prompt)
