@@ -208,7 +208,7 @@ def main():
             batch["padding_mask"] = batch["padding_mask"].to(args.device)
 
             prompts = get_prompts(batch, metadata, cfg, prompt_type=args.prompt_type)
-            
+            print(f"Prompts: {prompts}")
             # Generate transcriptions
             with torch.amp.autocast('cuda', dtype=torch.float16):
                 hypotheses = model.generate(batch, cfg.config.generate, prompts=prompts)
@@ -220,6 +220,7 @@ def main():
             for i, (ref, hyp, uid) in enumerate(zip(references, hypotheses, ids)):
                 # Clean up hypothesis (remove special tokens, extra whitespace)
                 hyp_clean = hyp.replace("</s>", "").replace("<s>", "").replace("<unk>", "").strip()
+                print(f"Hypothesis: {hyp_clean}")
                 # Extract the CONCLUSION tag from the hypothesis
                 conclusion_tags = re.search(r"<CONCLUSION>(.*?)</CONCLUSION>", hyp_clean)
                 if conclusion_tags is not None:
