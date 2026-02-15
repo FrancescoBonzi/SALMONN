@@ -224,6 +224,7 @@ def main():
                 conclusion_tags = re.search(r"<CONCLUSION>(.*?)</CONCLUSION>", hyp_clean)
                 if conclusion_tags is not None:
                     conclusion = conclusion_tags.group(1).strip()
+                    print(f"Conclusion: {conclusion}")
                 else:
                     conclusion = hyp_clean
                 
