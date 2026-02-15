@@ -228,7 +228,7 @@ def main():
                     print(f"Conclusion: {conclusion}")
                 else:
                     conclusion = hyp_clean
-                
+                print(f"Conclusion: {conclusion}")
                 results.append({
                     "id": uid,
                     "model_prediction": conclusion,
