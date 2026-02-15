@@ -206,14 +206,64 @@ def afthink_prompt_template(batch, metadata, cfg):
         ])
         prompt = f"{question} Choose the correct option from the following options:\n{choices}. USER: <Speech><SpeechHere></Speech> Output the answer with <SUMMARY>, <CAPTION>, <REASONING>, and <CONCLUSION> tags.\nASSISTANT:"
         prompts.append(prompt)
-    
+
     return prompts
 
+
+def cot_prompt_template(batch, metadata, cfg):
+    """
+    Chain-of-Thought prompt template that encourages step-by-step reasoning.
+    Uses structured tags to separate reasoning process from final answer.
+    """
+    prompts = []
+    for i in range(len(batch["id"])):
+        id = batch["id"][i]
+        question = metadata[id]["question"]
+
+        # Add proper punctuation to question
+        if not question.endswith("?") and not question.endswith("."):
+            if question.startswith(("Which", "What", "Who", "When", "Where", "Why", "How", "Are", "Is")):
+                question += "?"
+            else:
+                question += "."
+
+        # Format choices with letters
+        choices = "\n".join([
+            f"({letter}) {choice}"
+            for letter, choice in zip(
+                string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
+            )
+        ])
+
+        # CoT prompt with explicit reasoning instructions
+        prompt = f"""Listen to the audio carefully and answer the following question.
+
+Question: {question}
+
+Options:
+{choices}
+
+Instructions:
+1. First, analyze what you hear in the audio using the <ANALYSIS> tag
+2. Then, describe relevant audio characteristics using the <OBSERVATION> tag
+3. Next, reason through each option step-by-step using the <REASONING> tag
+4. Finally, provide ONLY your selected answer (the letter and option text) in the <CONCLUSION> tag
+
+USER: <Speech><SpeechHere></Speech>
+ASSISTANT: Let me analyze this step by step.
+
+<ANALYSIS>"""
+
+        prompts.append(prompt)
+
+    return prompts
 
 def get_prompts(batch, metadata, cfg, prompt_type="official"):
     if prompt_type == "official":
         return pretrained_prompt_template(batch, metadata, cfg)
     elif prompt_type == "afthink":
         return afthink_prompt_template(batch, metadata, cfg)
+    elif prompt_type == "reasoning":
+        return cot_prompt_template(batch, metadata, cfg)
     else:
         raise ValueError(f"Invalid prompt type: {prompt_type}")

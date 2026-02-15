@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --time=1:0:0
-#SBATCH --account=aip-csubakan
+#SBATCH --account=def-ravanelm
 #SBATCH --cpus-per-task=48
 #SBATCH --mem=488G
 #SBATCH --ntasks=1
@@ -68,7 +68,7 @@ source .venv/bin/activate
 
 echo "Evaluating MMAU..."
 python evaluate_mmau.py \
-    --cfg-path recipes/afthink/$model_type.yaml \
+    --cfg-path recipes/mmau/$model_type.yaml \
     --ckpt "$SLURM_TMPDIR/pretrained/ckpt.pth" \
     --batch-size 4 \
     --num-workers $SLURM_CPUS_PER_TASK \
@@ -88,7 +88,7 @@ echo "MMAU evaluation finished at $(date)"
 
 echo "Evaluating MMAR..."
 python evaluate_mmar.py \
-    --cfg-path recipes/afthink/$model_type.yaml \
+    --cfg-path recipes/mmar/$model_type.yaml \
     --ckpt "$SLURM_TMPDIR/pretrained/ckpt.pth" \
     --batch-size 4 \
     --num-workers $SLURM_CPUS_PER_TASK \
