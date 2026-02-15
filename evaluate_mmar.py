@@ -208,7 +208,7 @@ def main():
             batch["padding_mask"] = batch["padding_mask"].to(args.device)
 
             prompts = get_prompts(batch, metadata, cfg, prompt_type=args.prompt_type)
-            print(f"Prompts: {prompts}")
+            tqdm.write(f"Prompts: {prompts}")
             # Generate transcriptions
             with torch.amp.autocast('cuda', dtype=torch.float16):
                 hypotheses = model.generate(batch, cfg.config.generate, prompts=prompts)
@@ -225,7 +225,7 @@ def main():
                 conclusion_tags = re.search(r"<CONCLUSION>(.*?)</CONCLUSION>", hyp_clean)
                 if conclusion_tags is not None:
                     conclusion = conclusion_tags.group(1).strip()
-                    print(f"Conclusion: {conclusion}")
+                    tqdm.write(f"Conclusion: {conclusion}")
                 else:
                     conclusion = hyp_clean
                 print(f"Conclusion: {conclusion}")
