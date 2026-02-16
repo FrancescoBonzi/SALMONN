@@ -215,6 +215,7 @@ def cot_prompt_template(batch, metadata, cfg):
     Chain-of-Thought prompt template that encourages step-by-step reasoning.
     Uses structured tags to separate reasoning process from final answer.
     """
+    print("Inside COT prompt template")
     prompts = []
     for i in range(len(batch["id"])):
         id = batch["id"][i]
