@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=1:0:0
+#SBATCH --time=4:0:0
 #SBATCH --account=aip-ravanelm
 #SBATCH --cpus-per-task=48
 #SBATCH --mem=488G
@@ -90,7 +90,7 @@ echo "Evaluating MMAR..."
 python evaluate_mmar.py \
     --cfg-path recipes/mmar/$model_type.yaml \
     --ckpt "$SLURM_TMPDIR/pretrained/ckpt.pth" \
-    --batch-size 1 \
+    --batch-size 2 \
     --num-workers $SLURM_CPUS_PER_TASK \
     --device cuda:0 \
     --output-file "outputs/mmar/$eval_filename" \
