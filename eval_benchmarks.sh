@@ -18,7 +18,7 @@ seed=${seeds[$SLURM_ARRAY_TASK_ID]}
 model_type="salmonn"
 ckpt_path="pretrained/salmonn_v1.pth"
 ckpt_type="pretrained"
-prompt_type="official"
+prompt_type="reasoning"
 eval_filename="${model_type}_13B_${ckpt_type}_${prompt_type}prompt_seed${seed}.json"
 
 # Copy data to SLURM_TMPDIR for fast I/O
@@ -70,7 +70,7 @@ echo "Evaluating MMAU..."
 python evaluate_mmau.py \
     --cfg-path recipes/mmau/$model_type.yaml \
     --ckpt "$SLURM_TMPDIR/pretrained/ckpt.pth" \
-    --batch-size 4 \
+    --batch-size 2 \
     --num-workers $SLURM_CPUS_PER_TASK \
     --device cuda:0 \
     --output-file "outputs/mmau/$eval_filename" \
@@ -90,7 +90,7 @@ echo "Evaluating MMAR..."
 python evaluate_mmar.py \
     --cfg-path recipes/mmar/$model_type.yaml \
     --ckpt "$SLURM_TMPDIR/pretrained/ckpt.pth" \
-    --batch-size 4 \
+    --batch-size 1 \
     --num-workers $SLURM_CPUS_PER_TASK \
     --device cuda:0 \
     --output-file "outputs/mmar/$eval_filename" \
