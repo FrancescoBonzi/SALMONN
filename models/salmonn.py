@@ -769,6 +769,7 @@ class MutorSALMONN(SALMONN):
         # Create base 4D mask with 1s (attend) - will use causal masking from LLaMA
         mask_4d = torch.ones([batch_size, 1, total_len, total_len], dtype=speech_embeds.dtype, device=device)
         mask_4d[:, 0, start_regress:, start_regress:] = attention_mask_4d[:, 0, :, :]
+        mask_4d = torch.tril(mask_4d, diagonal=0)
 
         # Convert to additive mask format (1 → 0.0, 0 → -inf)
         mask_4d = 1.0 - mask_4d
@@ -810,25 +811,39 @@ class MutorSALMONN(SALMONN):
             real_targets = flat_targets[flat_real_indices]
             reg_targets = flat_targets[flat_reg_indices]
 
+            # Include prefix → x1 prediction (the audio-to-text bridge)
+            num_real = real_token_indices_batch.shape[1]
+            prefix_last_logit = logits[:, prefix_len - 1, :].unsqueeze(1)
+            first_token_target = input_ids[:, 0].clone().unsqueeze(1)
+            first_token_target[first_token_target == self.llama_tokenizer.pad_token_id] = -100
+
+            all_ntp_logits = torch.cat([prefix_last_logit, real_logits.view(batch_size, num_real, -1)], dim=1).reshape(-1, vocab_size)
+            all_ntp_targets = torch.cat([first_token_target, real_targets.view(batch_size, num_real)], dim=1).reshape(-1)
+
             # Compute loss for NTP and register tokens
-            loss_ntp = F.cross_entropy(real_logits, real_targets)
+            loss_ntp = F.cross_entropy(all_ntp_logits, all_ntp_targets)
             loss_reg = F.cross_entropy(reg_logits, reg_targets)
 
             # Combined loss (can be weighted if needed)
             loss = (1 - self.alpha) * loss_ntp + self.alpha * loss_reg
 
         if verbose:
-            results = flat_logits.argmax(dim=-1)
-            correct = (results == flat_targets).float().sum()
-            total = flat_targets.shape[0]
+            # NTP accuracy (includes prefix→x1 prediction)
+            ntp_preds = all_ntp_logits.argmax(dim=-1)
+            ntp_mask = (all_ntp_targets != -100)
+            ntp_correct = (ntp_preds[ntp_mask] == all_ntp_targets[ntp_mask]).float().sum()
+            ntp_total = ntp_mask.sum().item()
 
-            # Also compute separate accuracy for NTP and register
-            ntp_correct = (results[flat_real_indices] == real_targets).float().sum()
-            ntp_total = flat_real_indices.shape[0]
-            reg_correct = (results[flat_reg_indices] == reg_targets).float().sum()
-            reg_total = flat_reg_indices.shape[0]
+            # Register accuracy
+            reg_preds = reg_logits.argmax(dim=-1)
+            reg_mask = (reg_targets != -100)
+            reg_correct = (reg_preds[reg_mask] == reg_targets[reg_mask]).float().sum()
+            reg_total = reg_mask.sum().item()
 
-        if verbose:
+            # Overall accuracy
+            correct = ntp_correct + reg_correct
+            total = ntp_total + reg_total
+
             return {
                 "loss": loss,
                 "loss_ntp": loss_ntp,
