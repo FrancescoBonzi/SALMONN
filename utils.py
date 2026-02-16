@@ -231,7 +231,7 @@ def cot_prompt_template(batch, metadata, cfg):
             )
         ])
         # CoT prompt with explicit reasoning instructions
-        prompt = f"Question: {question}\nOptions:\n{choices}\n\nInstructions: Listen carefully and choose one option. Provide your answer in this format:\n<ANALYSIS>Describe what you hear</ANALYSIS>\n<REASONING>Explain your choice</REASONING>\n<CONCLUSION>(X) option text</CONCLUSION>\n\nUSER: <Speech><SpeechHere></Speech>\nASSISTANT:"
+        prompt = f"Question: {question}\nOptions:\n{choices}\n\nInstructions: Listen to the audio and answer step-by-step.\n\n1. Analysis: [what you hear]\n2. Reasoning: [why you choose this option]\n3. Answer: (X) option text\n\nUSER: <Speech><SpeechHere></Speech>\nASSISTANT: 1. Analysis:"
         prompts.append(prompt)
 
     return prompts

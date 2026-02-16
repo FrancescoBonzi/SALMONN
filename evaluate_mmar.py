@@ -219,31 +219,43 @@ def main():
             # Store results
             for i, (ref, hyp, uid) in enumerate(zip(references, hypotheses, ids)):
                 # Clean up hypothesis
+                # Clean up hypothesis
                 hyp_clean = hyp.replace("</s>", "").replace("<s>", "").replace("<unk>", "").strip()
 
-                # Extract CONCLUSION tag
-                conclusion_match = re.search(r"<CONCLUSION>\s*\(([A-Z])\)\s*(.*?)</CONCLUSION>", hyp_clean, re.DOTALL)
+                # Try multiple parsing strategies
+                conclusion = None
+                letter = None
 
+                # Strategy 1: Look for <CONCLUSION> tag
+                conclusion_match = re.search(r"<CONCLUSION>\s*\(([A-Z])\)\s*(.*?)</CONCLUSION>", hyp_clean, re.DOTALL)
                 if conclusion_match:
-                    letter = conclusion_match.group(1)  # e.g., "A"
-                    text = conclusion_match.group(2).strip()  # e.g., "10 times"
-                    conclusion = text  # Use the text for matching
-                    tqdm.write(f"Extracted: ({letter}) {text}")
-                else:
-                    # Fallback: try to find just the letter
+                    letter = conclusion_match.group(1)
+                    conclusion = conclusion_match.group(2).strip()
+                    tqdm.write(f"[CONCLUSION tag] ({letter}) {conclusion}")
+
+                # Strategy 2: Look for "Answer: (X) text" or "3. Answer: (X) text"
+                if not conclusion:
+                    answer_match = re.search(r"(?:\d+\.\s*)?Answer:\s*\(([A-Z])\)\s*(.*?)(?:\n|$)", hyp_clean,
+                                             re.IGNORECASE | re.DOTALL)
+                    if answer_match:
+                        letter = answer_match.group(1)
+                        conclusion = answer_match.group(2).strip()
+                        tqdm.write(f"[Answer pattern] ({letter}) {conclusion}")
+
+                # Strategy 3: Just find any (X) pattern
+                if not conclusion:
                     letter_match = re.search(r"\(([A-Z])\)", hyp_clean)
                     if letter_match:
                         letter = letter_match.group(1)
-                        # Map letter to actual choice text
                         letter_idx = ord(letter) - ord('A')
                         if 0 <= letter_idx < len(metadata[uid]["choices"]):
                             conclusion = metadata[uid]["choices"][letter_idx]
-                            tqdm.write(f"Extracted letter only: ({letter}) -> {conclusion}")
-                        else:
-                            conclusion = hyp_clean
-                    else:
-                        conclusion = hyp_clean
-                        tqdm.write(f"No CONCLUSION tag found, using full output")
+                            tqdm.write(f"[Letter only] ({letter}) -> {conclusion}")
+
+                # Strategy 4: Fallback to full output
+                if not conclusion:
+                    conclusion = hyp_clean
+                    tqdm.write(f"[Fallback] Using full output: {conclusion[:100]}...")
 
                 results.append({
                     "id": uid,
