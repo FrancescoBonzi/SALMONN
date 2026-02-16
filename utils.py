@@ -215,7 +215,6 @@ def cot_prompt_template(batch, metadata, cfg):
     Chain-of-Thought prompt template that encourages step-by-step reasoning.
     Uses structured tags to separate reasoning process from final answer.
     """
-    print("Inside COT prompt template")
     prompts = []
     for i in range(len(batch["id"])):
         id = batch["id"][i]
@@ -232,7 +231,7 @@ def cot_prompt_template(batch, metadata, cfg):
             )
         ])
         # CoT prompt with explicit reasoning instructions
-        prompt = f"Listen to the audio carefully and answer the following question. Question: {question} \nOptions: {choices} \nInstructions: First, analyze what you hear in the audio using the <ANALYSIS> tag. Then, describe relevant audio characteristics using the <OBSERVATION> tag. Next, reason through each option step-by-step using the <REASONING> tag. Finally, provide ONLY your selected answer (the letter and option text) in the <CONCLUSION> tag.\nUSER: <Speech><SpeechHere></Speech>\nASSISTANT:"
+        prompt = f"Question: {question}\nOptions:\n{choices}\n\nInstructions: Listen carefully and choose one option. Provide your answer in this format:\n<ANALYSIS>Describe what you hear</ANALYSIS>\n<REASONING>Explain your choice</REASONING>\n<CONCLUSION>(X) option text</CONCLUSION>\n\nExample: <CONCLUSION>(B) The speaker suddenly started dancing</CONCLUSION>\n\nUSER: <Speech><SpeechHere></Speech>\nASSISTANT:"
         prompts.append(prompt)
 
     return prompts

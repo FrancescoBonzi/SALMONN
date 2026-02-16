@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import re
 import string
 from tqdm import tqdm
@@ -291,6 +292,10 @@ def main():
                 torch.cuda.empty_cache()
 
     # Save results
+    output_dir = os.path.dirname(args.output_file)
+    if output_dir:  # Check if there's a directory component
+        os.makedirs(output_dir, exist_ok=True)
+
     with open(args.output_file, "w") as f:
         json.dump(results, f, indent=2)
     print(f"Results saved to {args.output_file}")

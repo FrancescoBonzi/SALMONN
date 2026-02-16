@@ -218,17 +218,33 @@ def main():
             
             # Store results
             for i, (ref, hyp, uid) in enumerate(zip(references, hypotheses, ids)):
-                # Clean up hypothesis (remove special tokens, extra whitespace)
+                # Clean up hypothesis
                 hyp_clean = hyp.replace("</s>", "").replace("<s>", "").replace("<unk>", "").strip()
-                print(f"Hypothesis: {hyp_clean}")
-                # Extract the CONCLUSION tag from the hypothesis
-                conclusion_tags = re.search(r"<CONCLUSION>(.*?)</CONCLUSION>", hyp_clean)
-                if conclusion_tags is not None:
-                    conclusion = conclusion_tags.group(1).strip()
-                    tqdm.write(f"Conclusion: {conclusion}")
+
+                # Extract CONCLUSION tag
+                conclusion_match = re.search(r"<CONCLUSION>\s*\(([A-Z])\)\s*(.*?)</CONCLUSION>", hyp_clean, re.DOTALL)
+
+                if conclusion_match:
+                    letter = conclusion_match.group(1)  # e.g., "A"
+                    text = conclusion_match.group(2).strip()  # e.g., "10 times"
+                    conclusion = text  # Use the text for matching
+                    tqdm.write(f"Extracted: ({letter}) {text}")
                 else:
-                    conclusion = hyp_clean
-                print(f"Conclusion: {conclusion}")
+                    # Fallback: try to find just the letter
+                    letter_match = re.search(r"\(([A-Z])\)", hyp_clean)
+                    if letter_match:
+                        letter = letter_match.group(1)
+                        # Map letter to actual choice text
+                        letter_idx = ord(letter) - ord('A')
+                        if 0 <= letter_idx < len(metadata[uid]["choices"]):
+                            conclusion = metadata[uid]["choices"][letter_idx]
+                            tqdm.write(f"Extracted letter only: ({letter}) -> {conclusion}")
+                        else:
+                            conclusion = hyp_clean
+                    else:
+                        conclusion = hyp_clean
+                        tqdm.write(f"No CONCLUSION tag found, using full output")
+
                 results.append({
                     "id": uid,
                     "model_prediction": conclusion,
