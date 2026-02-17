@@ -19,7 +19,7 @@ model_type="salmonn"
 ckpt_path="pretrained/salmonn_v1.pth"
 ckpt_type="finetuned"
 prompt_type="afthink"
-eval_filename="${model_type}_13B_${ckpt_type}_${prompt_type}prompt_seed${seed}.json"
+eval_filename="${model_type}_13B_${ckpt_type}_${prompt_type}prompt/seed${seed}.json"
 
 # Copy data to SLURM_TMPDIR for fast I/O
 echo "Copying data to SLURM_TMPDIR..."

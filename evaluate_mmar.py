@@ -1,7 +1,9 @@
 import argparse
 import json
+import os
 import re
-import string
+import sys
+from io import StringIO
 from tqdm import tqdm
 
 import torch
@@ -245,13 +247,26 @@ def main():
                 torch.cuda.empty_cache()
 
     # Save results
-    with open(args.output_file, "w") as f:
+    os.makedirs(os.path.dirname(args.output_file), exist_ok=True)
+    answers_path = args.output_file.replace(".json", "_answers.json")
+    with open(answers_path, "w") as f:
         json.dump(results, f, indent=2)
-    print(f"Results saved to {args.output_file}")
+    print(f"Results saved to {answers_path}")
 
-    # Compute metrics
+    # Compute metrics (capture print output and write to file)
+    old_stdout = sys.stdout
+    sys.stdout = StringIO()
     corr, total = official_mmar_evaluation(results)
+    metrics_output = sys.stdout.getvalue()
+    sys.stdout = old_stdout
+    print(metrics_output)
     print(f"Official MMAR Accuracy: {(corr/total) * 100:.2f}% over {total} samples")
+
+    # Write metrics to .txt file in same directory as output_file
+    metrics_path = args.output_file.replace(".json", "_metrics.txt")
+    with open(metrics_path, "w") as f:
+        f.write(metrics_output)
+    print(f"Metrics saved to {metrics_path}")
 
 
 if __name__ == "__main__":
