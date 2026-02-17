@@ -267,12 +267,41 @@ def main():
             for i, (ref, hyp, uid) in enumerate(zip(references, hypotheses, ids)):
                 # Clean up hypothesis (remove special tokens, extra whitespace)
                 hyp_clean = hyp.replace("</s>", "").replace("<s>", "").replace("<unk>", "").strip()
-                # Extract the CONCLUSION tag from the hypothesis
-                conclusion_tags = re.search(r"<CONCLUSION>(.*?)</CONCLUSION>", hyp_clean)
-                if conclusion_tags is not None:
-                    conclusion = conclusion_tags.group(1).strip()
-                else:
+
+                # Try multiple parsing strategies
+                conclusion = None
+                letter = None
+
+                # Strategy 1: Look for <CONCLUSION> tag
+                conclusion_match = re.search(r"<CONCLUSION>\s*\(([A-Z])\)\s*(.*?)</CONCLUSION>", hyp_clean, re.DOTALL)
+                if conclusion_match:
+                    letter = conclusion_match.group(1)
+                    conclusion = conclusion_match.group(2).strip()
+                    tqdm.write(f"[CONCLUSION tag] ({letter}) {conclusion}")
+
+                # Strategy 2: Look for "Answer: (X) text" or "3. Answer: (X) text"
+                if not conclusion:
+                    answer_match = re.search(r"(?:\d+\.\s*)?Answer:\s*\(([A-Z])\)\s*(.*?)(?:\n|$)", hyp_clean,
+                                             re.IGNORECASE | re.DOTALL)
+                    if answer_match:
+                        letter = answer_match.group(1)
+                        conclusion = answer_match.group(2).strip()
+                        tqdm.write(f"[Answer pattern] ({letter}) {conclusion}")
+
+                # Strategy 3: Just find any (X) pattern
+                if not conclusion:
+                    letter_match = re.search(r"\(([A-Z])\)", hyp_clean)
+                    if letter_match:
+                        letter = letter_match.group(1)
+                        letter_idx = ord(letter) - ord('A')
+                        if 0 <= letter_idx < len(metadata[uid]["choices"]):
+                            conclusion = metadata[uid]["choices"][letter_idx]
+                            tqdm.write(f"[Letter only] ({letter}) -> {conclusion}")
+
+                # Strategy 4: Fallback to full output
+                if not conclusion:
                     conclusion = hyp_clean
+                    tqdm.write(f"[Fallback] Using full output: {conclusion[:100]}...")
                 
                 results.append({
                     "id": uid,
