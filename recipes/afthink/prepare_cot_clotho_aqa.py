@@ -47,7 +47,7 @@ def prepare_cot_clotho_aqa_annotations(output_dir: str):
         audio_path = str(output_dir / sound_name)
         train_annotations.append({
             "path": audio_path,
-            "task": "reasoning",
+            "task": "afthink_reasoning",
             "question": item["conversations"][0]["value"].replace("<sound>", "").replace("Output the answer with <SUMMARY>, <CAPTION>, <REASONING>, and <CONCLUSION> tags.", "").strip(),
             "answer": item["conversations"][1]["value"],
         })

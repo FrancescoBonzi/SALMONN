@@ -129,7 +129,10 @@
         "<Speech><SpeechHere></Speech> Write down the content of each speaker and the corresponding speech in turn.",
         "<Speech><SpeechHere></Speech> Please recognize each speaker and transcribe their speech content."
     ],
-    "reasoning": [
+    "afthink_reasoning": [
         "<Speech><SpeechHere></Speech> Output the answer with <SUMMARY>, <CAPTION>, <REASONING>, and <CONCLUSION> tags."
+    ],
+    "afthink_no_reasoning": [
+        "<Speech><SpeechHere></Speech> Answer with the correct option."
     ]
 }
