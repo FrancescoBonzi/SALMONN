@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from pathlib import Path
 
 
@@ -10,18 +11,22 @@ def prepare_af_youtube8m_annotations(source_annotations_dir: str, target_annotat
     # Read the .json files in the source annotations directory
     for json_file in source_annotations_dir.glob("*.json"):
         target_annotation_file = target_annotations_dir / json_file.name
+        print(f"Processing {json_file.name}...")
         with open(json_file, "r") as f:
             source_annotations = json.load(f)
             source_annotations = source_annotations["annotation"]
+            print(f"Found {len(source_annotations)} annotations in {json_file.name}")
 
         # Remove the reasoning part from the question
         for annotation in source_annotations:
-            answer = annotation["answer"].split("<CONCLUSION>(.*?)</CONCLUSION>")[1].strip()
+            match = re.search(r"<CONCLUSION>(.*?)</CONCLUSION>", annotation["answer"], re.DOTALL)
+            answer = match.group(1).strip()
             annotation["answer"] = answer
 
         # Save the target annotations
         with open(target_annotation_file, "w") as f:
             json.dump({"annotation": source_annotations}, f, indent=2)
+            print(f"Saved {len(source_annotations)} annotations to {target_annotation_file}")
 
 
 if __name__ == "__main__":
