@@ -57,7 +57,7 @@ run:
 
   log_freq: 10
   epoch_based: False
-  iters_per_epoch: 5000
+  iters_per_epoch: 4000
   accum_grad_iters: 16
   batch_size_train: 2
   batch_size_eval: 8
