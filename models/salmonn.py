@@ -1145,6 +1145,7 @@ class MutorBERTSummarySALMONN(MutorSALMONN):
                 return_dict=True,
                 labels=None,
                 output_hidden_states=True,
+                use_cache=False,
             )
             logits = outputs.logits
 
