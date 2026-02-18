@@ -2,13 +2,13 @@
     "annotation": [
       {
         "path": "data/afthink_debug/samples/Pas sur le sol.wav",
-        "task": "reasoning",
+        "task": "afthink_reasoning",
         "question": "\nis someone simply walking the whole time? Choose the correct option from the following options:\n(A) yes\n(B) no.",
         "answer": "<SUMMARY> The question wants to determine if someone is walking continuously throughout the audio. I will first check for consistent walking sounds (e.g., footsteps, rustling clothes). If present, I will then look for interruptions or other sounds (e.g., pauses, environmental noises) that might indicate stopping. Finally, I will confirm if the walking sounds remain uninterrupted across the entire audio. </SUMMARY>\n<CAPTION> The sound of a woman walking on a wood floor is heard. </CAPTION>\n<REASONING> The audio contains continuous walking sounds (e.g., footsteps) without interruptions. There are no pauses or other sounds (e.g., environmental noises, conversations) that indicate the person stopped walking. The pattern of walking sounds remains uninterrupted throughout the entire audio. </REASONING>\n<CONCLUSION> yes </CONCLUSION>"
       },
       {
         "path": "data/afthink_debug/samples/Bear Last Audio.wav",
-        "task": "reasoning",
+        "task": "afthink_reasoning",
         "question": "\nThis kind of a noise from an animal would be considered a what? Choose the correct option from the following options:\n(A) growl\n(B) bark\n(C) roar\n(D) chirp.",
         "answer": "<SUMMARY> The question wants to determine the classification of an animal's noise. I will first identify the specific type of noise described in the audio, then associate it with the corresponding animal, and finally classify it based on animal behavior or communication. </SUMMARY>\n<CAPTION> A man is grunting and growling. </CAPTION>\n<REASONING> Identify the specific type of noise in the audio. The sound is a growl. Classify this noise as a growl, which is an animal's vocalization. Therefore, the correct answer is (A). </REASONING>\n<CONCLUSION> growl </CONCLUSION>"
       }
