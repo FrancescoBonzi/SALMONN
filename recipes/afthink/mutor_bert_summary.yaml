@@ -1,7 +1,13 @@
 # Clotho-AQA Reasoning Training Config for SALMONN
 
 model:
-  model_type: "salmonn"
+  model_type: "mutor_bert_summary"
+  
+  # MuToR hyperparameters
+  #mutor_min_offset: 2 # not used
+  #mutor_max_offset: 4 # not used
+  mutor_alpha: 0.5
+  #mutor_alpha_decay_temperature: False # not used
 
   # Model paths (download with: python recipes/download_pretrained.sh)
   llama_path: "pretrained/vicuna-13b-v1.1"
@@ -46,7 +52,7 @@ datasets:
 
 run:
   seed: 42
-  output_dir: "outputs/salmonn"
+  output_dir: "outputs/mutor_bert_summary"
   evaluate: False
   save_only_best: True
 

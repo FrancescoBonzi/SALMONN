@@ -12,13 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .salmonn import SALMONN, MutorSALMONN
+from .salmonn import SALMONN, CoTSALMONN, MutorSALMONN, MutorBERTSummarySALMONN
 
 def load_model(config):
     model_type = config.get("model_type", "salmonn")
     if model_type == "salmonn":
         return SALMONN.from_config(config)
+    elif model_type == "cot_salmonn":
+        return CoTSALMONN.from_config(config)
     elif model_type == "mutor":
         return MutorSALMONN.from_config(config)
+    elif model_type == "mutor_bert_summary":
+        return MutorBERTSummarySALMONN.from_config(config)
     else:
         raise ValueError(f"Invalid model type: {model_type}")

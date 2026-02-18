@@ -43,15 +43,15 @@ model:
   end_sym: "</s>"
 
 datasets:
-  train_ann_path: "data/Clotho-AQA/annotations/train_clotho_aqa.json"
-  valid_ann_path: "data/Clotho-AQA/annotations/train_clotho_aqa.json"
-  test_ann_path: "data/Clotho-AQA/annotations/train_clotho_aqa.json"
+  train_ann_path: ""
+  valid_ann_path: ""
+  test_ann_path: ""
 
   whisper_path: "pretrained/whisper-large-v2"
 
 run:
   seed: 42
-  output_dir: "outputs/afthink_clotho_aqa/mutor"
+  output_dir: "outputs/mutor"
   evaluate: False
   save_only_best: True
 
