@@ -5,7 +5,7 @@ model:
 
   # MuToR hyperparameters
   mutor_min_offset: 2
-  mutor_max_offset: 4
+  mutor_max_offset: 20
   mutor_alpha: 0.5
   mutor_alpha_decay_temperature: 5.0
 
