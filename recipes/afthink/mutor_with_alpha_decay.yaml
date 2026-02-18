@@ -6,8 +6,8 @@ model:
   # MuToR hyperparameters
   mutor_min_offset: 2
   mutor_max_offset: 4
-  mutor_alpha: 0.1
-  mutor_alpha_decay_temperature: 0.0
+  mutor_alpha: 0.5
+  mutor_alpha_decay_temperature: 5.0
 
   # Model paths (download with: python recipes/download_pretrained.sh)
   llama_path: "pretrained/vicuna-13b-v1.1"
