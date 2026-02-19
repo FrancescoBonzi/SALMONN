@@ -1160,7 +1160,7 @@ class MutorBERTSummarySALMONN(MutorSALMONN):
         reg_hidden = last_hidden_state[reg_batch_idx, prefix_len + reg_seq_idx]
         reg_projected = self.chapter_proj(reg_hidden)
         _, counts = torch.unique(reg_batch_idx, return_counts=True)
-        existing_chapters_mask = torch.arange(num_chapters) < counts.unsqueeze(1)
+        existing_chapters_mask = torch.arange(num_chapters, device=counts.device) < counts.unsqueeze(1)
         reg_aligned = reg_projected.new_zeros(batch_size, num_chapters, reg_projected.shape[-1])
         reg_aligned[existing_chapters_mask] = reg_projected
         loss_reg = F.mse_loss(reg_aligned, chapter_embeds)
