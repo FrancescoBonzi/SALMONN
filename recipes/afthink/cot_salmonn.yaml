@@ -1,7 +1,7 @@
 # Clotho-AQA Reasoning Training Config for SALMONN
 
 model:
-  model_type: "salmonn"
+  model_type: "cot_salmonn"
 
   # Model paths (download with: python recipes/download_pretrained.sh)
   llama_path: "pretrained/vicuna-13b-v1.1"
@@ -46,7 +46,7 @@ datasets:
 
 run:
   seed: 42
-  output_dir: "outputs/salmonn"
+  output_dir: "outputs/cot_salmonn"
   evaluate: False
   save_only_best: True
 
