@@ -1039,38 +1039,35 @@ class MutorBERTSummarySALMONN(MutorSALMONN):
             text = [t + self.end_sym for t in samples["text"]]
 
         # Extract chapter summary from text & add register tokens before each chapter
-        chapter_embeds = []
         text_with_registers = []
+        all_chapter_texts = []
         chapter_names = ["SUMMARY", "CAPTION", "REASONING", "CONCLUSION"]
         for t in text:
-            chapter_embed = []
             tmp_text = []
             for chapter_name in chapter_names:
                 match = re.search(rf"<{chapter_name}>(.*?)</{chapter_name}>", t, re.DOTALL)
                 chapter_text = match.group(1).strip()
-
-                # Add register token before and after the chapter text
                 tmp_text.append("<reg>")
                 tmp_text.append(f"<{chapter_name}>")
                 tmp_text.append(chapter_text)
                 tmp_text.append(f"</{chapter_name}>")
-
-                # Embed using BERT
-                encoded = self.chapter_tokenizer(
-                    chapter_text,
-                    return_tensors="pt",
-                    padding=True,
-                    truncation=True,
-                    max_length=512,
-                ).to(self.device)
-                with torch.no_grad():
-                    bert_out = self.chapter_encoder(**encoded)
-                
-                embed = bert_out.last_hidden_state[0, 0, :].detach().clone() # [CLS] token
-                chapter_embed.append(embed)
+                all_chapter_texts.append(chapter_text)
             text_with_registers.append("".join(tmp_text))
-            chapter_embeds.append(torch.stack(chapter_embed))
-        chapter_embeds = torch.stack(chapter_embeds)
+
+        # Batch BERT encoding for all chapters at once
+        encoded = self.chapter_tokenizer(
+            all_chapter_texts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=512,
+        ).to(self.device)
+        with torch.no_grad():
+            bert_out = self.chapter_encoder(**encoded)
+            chapter_embeds = bert_out.last_hidden_state[:, 0, :].detach().clone()
+        del encoded, bert_out
+        num_chapters = len(chapter_names)
+        chapter_embeds = chapter_embeds.view(len(text), num_chapters, -1)
 
         # Tokenize text with registers
         to_regress_tokens = self.llama_tokenizer(
@@ -1162,10 +1159,13 @@ class MutorBERTSummarySALMONN(MutorSALMONN):
         reg_batch_idx, reg_seq_idx = reg_token_indices
         reg_hidden = last_hidden_state[reg_batch_idx, prefix_len + reg_seq_idx]
         reg_projected = self.chapter_proj(reg_hidden)
-        reg_projected = reg_projected.view(batch_size, -1, reg_projected.shape[-1])
-        loss_reg = F.mse_loss(reg_projected, chapter_embeds)
+        _, counts = torch.unique(reg_batch_idx, return_counts=True)
+        existing_chapters_mask = torch.arange(num_chapters) < counts.unsqueeze(1)
+        reg_aligned = reg_projected.new_zeros(batch_size, num_chapters, reg_projected.shape[-1])
+        reg_aligned[existing_chapters_mask] = reg_projected
+        loss_reg = F.mse_loss(reg_aligned, chapter_embeds)
 
-        loss = (1 - self.alpha) * loss_ntp + self.alpha * loss_reg
+        loss = loss_ntp + self.alpha * loss_reg
 
         if verbose:
             # NTP accuracy (includes prefix→x1 prediction)

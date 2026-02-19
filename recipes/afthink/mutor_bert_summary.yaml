@@ -4,10 +4,7 @@ model:
   model_type: "mutor_bert_summary"
   
   # MuToR hyperparameters
-  #mutor_min_offset: 2 # not used
-  #mutor_max_offset: 4 # not used
-  mutor_alpha: 0.5
-  #mutor_alpha_decay_temperature: False # not used
+  mutor_alpha: 1.0
 
   # Model paths (download with: python recipes/download_pretrained.sh)
   llama_path: "pretrained/vicuna-13b-v1.1"
@@ -40,7 +37,7 @@ model:
   prompt_template: "USER: {}\nASSISTANT:"
   prompt_path: "prompts/train_prompt.json"
   test_prompt_path: "prompts/test_prompt.json"
-  max_txt_len: 512
+  max_txt_len: 400
   end_sym: "</s>"
 
 datasets:
