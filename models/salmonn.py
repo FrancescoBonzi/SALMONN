@@ -1066,7 +1066,7 @@ class MutorBERTSummarySALMONN(MutorSALMONN):
                 with torch.no_grad():
                     bert_out = self.chapter_encoder(**encoded)
                 
-                embed = bert_out.last_hidden_state[0, 0, :] # [CLS] token
+                embed = bert_out.last_hidden_state[0, 0, :].detach().clone() # [CLS] token
                 chapter_embed.append(embed)
             text_with_registers.append("".join(tmp_text))
             chapter_embeds.append(torch.stack(chapter_embed))
@@ -1148,6 +1148,8 @@ class MutorBERTSummarySALMONN(MutorSALMONN):
                 use_cache=False,
             )
             logits = outputs.logits
+            last_hidden_state = outputs.hidden_states[-1]
+            del outputs
 
         prefix_len = bos_embeds.shape[1] + speech_embeds.shape[1]
         vocab_size = logits.shape[-1]
@@ -1157,9 +1159,8 @@ class MutorBERTSummarySALMONN(MutorSALMONN):
         loss_ntp = F.cross_entropy(shift_logits, shift_targets, ignore_index=-100)
 
         # Register embedding loss
-        hidden_states = outputs.hidden_states[-1]
         reg_batch_idx, reg_seq_idx = reg_token_indices
-        reg_hidden = hidden_states[reg_batch_idx, prefix_len + reg_seq_idx]
+        reg_hidden = last_hidden_state[reg_batch_idx, prefix_len + reg_seq_idx]
         reg_projected = self.chapter_proj(reg_hidden)
         reg_projected = reg_projected.view(batch_size, -1, reg_projected.shape[-1])
         loss_reg = F.mse_loss(reg_projected, chapter_embeds)
