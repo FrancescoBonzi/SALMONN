@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .salmonn import SALMONN, CoTSALMONN, MutorSALMONN, MutorBERTSummarySALMONN
+from .salmonn import SALMONN, CoTSALMONN, MutorSALMONN, MutorBERTSummarySALMONN, ReverseSALMONN
 
 def load_model(config):
     model_type = config.get("model_type", "salmonn")
@@ -20,6 +20,8 @@ def load_model(config):
         return SALMONN.from_config(config)
     elif model_type == "cot_salmonn":
         return CoTSALMONN.from_config(config)
+    elif model_type == "reverse_salmonn":
+        return ReverseSALMONN.from_config(config)
     elif model_type == "mutor":
         return MutorSALMONN.from_config(config)
     elif model_type == "mutor_bert_summary":
