@@ -723,7 +723,10 @@ class ReverseSALMONN(SALMONN):
 
         return model
 
-    def prompt_wrap(self, embeds, atts, prompt, multi_prompt=False):
+    def _prompt_wrap_with_att_masks(self, embeds, atts, prompt, multi_prompt=False):
+        """ReverseSALMONN-specific: returns (embeds, atts, p_before_atts, p_after_atts).
+        Do not override prompt_wrap - base class expects 2 return values when super().forward() is called.
+        """
         if prompt:
             if multi_prompt:
                 p_before = []
@@ -811,7 +814,7 @@ class ReverseSALMONN(SALMONN):
 
         # wrap speech_embeds with prompts (includes question for reasoning tasks)
         if self.prompt_dict:
-            speech_embeds, speech_atts, p_before_atts, p_after_atts = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt)
+            speech_embeds, speech_atts, p_before_atts, p_after_atts = self._prompt_wrap_with_att_masks(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt)
 
         # Reverse the sequence
         reversed_speech_embeds = speech_embeds.flip(dims=[1])
