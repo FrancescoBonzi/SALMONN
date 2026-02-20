@@ -16,7 +16,6 @@ seed=${seeds[$SLURM_ARRAY_TASK_ID]}
 
 # Define config variables
 model_type="salmonn"
-ckpt_path="pretrained/salmonn_v1.pth"
 ckpt_type="finetuned"
 prompt_type="afthink"
 eval_filename="${model_type}_13B_${ckpt_type}_${prompt_type}prompt/seed${seed}.json"
@@ -49,11 +48,8 @@ COPY_VICUNA_PID=$!
 cp "pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" "$SLURM_TMPDIR/pretrained/" &
 COPY_BEATS_PID=$!
 
-cp "$ckpt_path" "$SLURM_TMPDIR/pretrained/ckpt.pth" &
-COPY_SALMONN_PID=$!
-
 # Wait for all copies to finish
-wait $COPY_WHISPER_PID $COPY_VICUNA_PID $COPY_BEATS_PID $COPY_SALMONN_PID
+wait $COPY_WHISPER_PID $COPY_VICUNA_PID $COPY_BEATS_PID
 echo "Pretrained models copy complete!"
 
 # Update annotation paths to point to SLURM_TMPDIR
