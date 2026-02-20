@@ -1381,7 +1381,20 @@ class MutorBERTSummarySALMONN(MutorSALMONN):
         ).to(self.device)
         with torch.no_grad():
             bert_out = self.chapter_encoder(**encoded)
-            chapter_embeds = bert_out.last_hidden_state[:, 0, :].detach().clone()
+
+            # Get the token embeddings and the attention mask
+            token_embeddings = bert_out.last_hidden_state
+            attention_mask = encoded["attention_mask"]
+
+            # Expand the mask to match embeddings shape
+            input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+
+            # Sum embeddings, ignoring padded tokens
+            sum_embeddings = torch.sum(token_embeddings * input_mask_expanded, 1)
+
+            # Divide by the number of non-padded tokens
+            sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+            chapter_embeds = sum_embeddings / sum_mask
         del encoded, bert_out
         num_chapters = len(chapter_names)
         chapter_embeds = chapter_embeds.view(len(text), num_chapters, -1)
@@ -1480,7 +1493,9 @@ class MutorBERTSummarySALMONN(MutorSALMONN):
         existing_chapters_mask = torch.arange(num_chapters, device=counts.device) < counts.unsqueeze(1)
         reg_aligned = reg_projected.new_zeros(batch_size, num_chapters, reg_projected.shape[-1])
         reg_aligned[existing_chapters_mask] = reg_projected
-        loss_reg = F.mse_loss(reg_aligned, chapter_embeds)
+        cos_sim = F.cosine_similarity(reg_aligned, chapter_embeds, dim=-1)
+        cos_sim = cos_sim.masked_fill(~existing_chapters_mask, 1.0)
+        loss_reg = (1 - cos_sim).sum() / existing_chapters_mask.sum().clamp(min=1e-9)
 
         loss = loss_ntp + self.alpha * loss_reg
 
