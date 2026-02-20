@@ -11,7 +11,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from config import Config
-from models.salmonn import SALMONN, MutorSALMONN
+from models import load_model
 from dataset import SALMONNDataset
 from utils import get_prompts
 
@@ -213,14 +213,10 @@ def main():
     # Set checkpoint path in config so from_config loads it automatically
     cfg.config.model.ckpt = args.ckpt
     
-    # Use appropriate model class based on model_type
+    # Use appropriate model class based on model_type (salmonn, mutor, mutor_bert_summary, etc.)
     model_type = cfg.config.model.get("model_type", "salmonn")
-    if model_type == "mutor":
-        print("Loading MutorSALMONN model...")
-        model = MutorSALMONN.from_config(cfg.config.model)
-    else:
-        print("Loading SALMONN model...")
-        model = SALMONN.from_config(cfg.config.model)
+    print(f"Loading {model_type} model...")
+    model = load_model(cfg.config.model)
     model.to(args.device)
     model.eval()
     

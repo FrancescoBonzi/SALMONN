@@ -6,10 +6,10 @@
 #SBATCH --ntasks=1
 #SBATCH --gpus-per-node=h100:4
 #SBATCH --nodes=1
-#SBATCH --array=0-0
+#SBATCH --array=0-5
 
 # Define seeds array
-seeds=(42)
+seeds=(1 2 3 4 5 6)
 
 # Get the seed for this job array index
 seed=${seeds[$SLURM_ARRAY_TASK_ID]}
@@ -17,9 +17,9 @@ seed=${seeds[$SLURM_ARRAY_TASK_ID]}
 # Define config variables
 model_type="salmonn"
 ckpt_path="pretrained/salmonn_v1.pth"
-ckpt_type="pretrained"
-prompt_type="official"
-eval_filename="${model_type}_13B_${ckpt_type}_${prompt_type}prompt_seed${seed}.json"
+ckpt_type="finetuned"
+prompt_type="afthink"
+eval_filename="${model_type}_13B_${ckpt_type}_${prompt_type}prompt/seed${seed}.json"
 
 # Copy data to SLURM_TMPDIR for fast I/O
 echo "Copying data to SLURM_TMPDIR..."
@@ -66,10 +66,16 @@ module load StdEnv/2023 cuda/12.2
 module load httpproxy
 source .venv/bin/activate
 
+# Find the output directory
+OUTPUT_DIR=$(ls -dt outputs/afthink_youtube8m/$model_type/$seed/* | head -n 1)
+BEST_CKPT="${OUTPUT_DIR}/checkpoint_best.pth"
+
+echo "Using checkpoint: $BEST_CKPT"
+
 echo "Evaluating MMAU..."
 python evaluate_mmau.py \
     --cfg-path recipes/afthink/$model_type.yaml \
-    --ckpt "$SLURM_TMPDIR/pretrained/ckpt.pth" \
+    --ckpt "$BEST_CKPT" \
     --batch-size 4 \
     --num-workers $SLURM_CPUS_PER_TASK \
     --device cuda:0 \
@@ -89,7 +95,7 @@ echo "MMAU evaluation finished at $(date)"
 echo "Evaluating MMAR..."
 python evaluate_mmar.py \
     --cfg-path recipes/afthink/$model_type.yaml \
-    --ckpt "$SLURM_TMPDIR/pretrained/ckpt.pth" \
+    --ckpt "$BEST_CKPT" \
     --batch-size 4 \
     --num-workers $SLURM_CPUS_PER_TASK \
     --device cuda:0 \
