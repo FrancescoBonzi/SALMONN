@@ -1517,3 +1517,186 @@ class MutorBERTSummarySALMONN(MutorSALMONN):
         return {"loss": loss, "loss_ntp": loss_ntp, "loss_reg": loss_reg}
 
 
+class MutorBERTConclusionSALMONN(MutorSALMONN):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        _bert_model_name = "sentence-transformers/all-MiniLM-L6-v2"
+        self.conclusion_tokenizer = AutoTokenizer.from_pretrained(_bert_model_name)
+        self.conclusion_encoder = AutoModel.from_pretrained(_bert_model_name)
+        self.conclusion_encoder.eval()
+        for param in self.conclusion_encoder.parameters():
+            param.requires_grad = False
+
+        self.conclusion_proj = nn.Linear(
+            self.llama_model.config.hidden_size, #256
+            384, # BERT embedding size
+        )
+
+    def forward(self, samples, verbose=False):
+        if not self.training:
+            return super(MutorSALMONN, self).forward(samples, verbose)
+
+        task = list(set(samples["task"]))
+        if len(task) > 1 or "QA" in task:
+            self.multi_prompt = True
+
+        # prepare prompts
+        if self.prompt_dict:
+            if self.multi_prompt:
+                prompt = [random.choice(self.prompt_dict[task]) for task in samples["task"]]
+                if "Q" in samples:
+                    prompt = [p.format(q) if '{}' in p else p for p, q in zip(prompt, samples["Q"]) ]
+            else:
+                prompt = random.choice(self.prompt_dict[samples["task"][0]])
+
+            # For reasoning tasks, concatenate question + prompt
+            if "question" in samples and any(samples["question"]):
+                if not self.multi_prompt:
+                    prompt = [prompt] * len(samples["question"])
+                    self.multi_prompt = True
+                prompt = [q + " " + p for p, q in zip(prompt, samples["question"])]
+
+        # use speech/audio encoder to encode speech/audio
+        spectrogram = samples["spectrogram"]
+        raw_wav = samples.get("raw_wav", None)
+        audio_padding_mask = samples.get("padding_mask", None)
+
+        speech_embeds, speech_atts = self.encode_speech(spectrogram, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask)
+
+        # wrap speech_embeds with prompts (includes question for reasoning tasks)
+        if self.prompt_dict:
+            speech_embeds, speech_atts = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt)
+
+        # prepare inputs for LLM (use answer for reasoning tasks, text for ASR)
+        if "answer" in samples and any(samples["answer"]):
+            text = [t + self.end_sym for t in samples["answer"]]
+        else:
+            text = [t + self.end_sym for t in samples["text"]]
+
+        # Extract chapter summary from text & add register tokens before each chapter
+        all_conclusion_texts = []
+        for i, t in enumerate(text):
+            match = re.search(rf"<CONCLUSION>(.*?)</CONCLUSION>", t, re.DOTALL)
+            conclusion_text = match.group(1).strip()
+            all_conclusion_texts.append(conclusion_text)
+            text[i] = "<reg>" + t
+
+        # Batch BERT encoding for all chapters at once
+        encoded = self.conclusion_tokenizer(
+            all_conclusion_texts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=512,
+        ).to(self.device)
+        with torch.no_grad():
+            bert_out = self.conclusion_encoder(**encoded)
+            conclusion_embeds = F.normalize(bert_out.last_hidden_state[:, 0, :], p=2, dim=1)
+
+        # Tokenize text with registers
+        to_regress_tokens = self.llama_tokenizer(
+            text,
+            return_tensors="pt",
+            padding="longest",
+            truncation=True,
+            max_length=self.max_txt_len,
+            add_special_tokens=False
+        ).to(spectrogram.device)
+
+        batch_size = to_regress_tokens.input_ids.shape[0]
+        device = to_regress_tokens.input_ids.device
+
+        # Set attention mask for registers to 0
+        attention_mask = to_regress_tokens.attention_mask
+        attention_mask[:, 0] = 0.0
+
+        # Get token embeddings
+        to_regress_embeds = self.llama_model.model.embed_tokens(to_regress_tokens.input_ids) if not self.lora else self.llama_model.model.model.embed_tokens(to_regress_tokens.input_ids)
+
+        ### Construct inputs + targets for LLM ###
+
+        bos = torch.ones(
+            [batch_size, 1],
+            dtype=torch.long,
+            device=device,
+        ) * self.llama_tokenizer.bos_token_id
+        bos_embeds = self.llama_model.model.embed_tokens(bos) if not self.lora else self.llama_model.model.model.embed_tokens(bos)
+
+        # Construct inputs for LLM
+        inputs_embeds = torch.cat([bos_embeds, speech_embeds, to_regress_embeds], dim=1)
+
+        # Construct attention mask for the interleaved sequences
+        total_len = bos_embeds.shape[1] + speech_embeds.shape[1] + to_regress_embeds.shape[1]
+        start_regress = bos_embeds.shape[1] + speech_embeds.shape[1]
+
+        # Create base 4D causal mask
+        mask_4d = torch.ones([batch_size, 1, total_len, total_len], dtype=speech_embeds.dtype, device=device)
+        mask_4d = torch.tril(mask_4d, diagonal=0)
+
+        # Apply 2D attention mask: zero out columns where attention_mask == 0
+        mask_4d[:, 0, :, start_regress:] *= attention_mask.unsqueeze(1).to(mask_4d.dtype)
+        mask_4d[:, 0, start_regress, start_regress] = 1.0
+
+        # Convert to additive mask format (1 → 0.0, 0 → -inf)
+        mask_4d = 1.0 - mask_4d
+        mask_4d = mask_4d.masked_fill(mask_4d > 0.5, float(torch.finfo(mask_4d.dtype).min))
+
+        # Position IDs
+        position_ids = torch.cat([
+            torch.arange(start_regress, device=device).unsqueeze(0).repeat(batch_size, 1), 
+            torch.cumsum(attention_mask, dim=1) + start_regress - 1
+        ], dim=1)
+
+        # Construct targets for the sequence without registers
+        targets = torch.full_like(to_regress_tokens.input_ids, -100)
+        for i in range(batch_size):
+            valid_mask = attention_mask[i].bool()
+            valid_tokens = to_regress_tokens.input_ids[i, valid_mask]
+            targets[i, valid_mask] = torch.cat([valid_tokens[1:], torch.tensor([-100], device=device)])
+
+        # Calculate loss with separate NTP and register losses
+        with self.maybe_autocast():
+            outputs = self.llama_model(
+                inputs_embeds=inputs_embeds,
+                attention_mask=mask_4d,
+                position_ids=position_ids,
+                return_dict=True,
+                labels=None,
+                output_hidden_states=True,
+                use_cache=False,
+            )
+            logits = outputs.logits
+            last_hidden_state = outputs.hidden_states[-1]
+            del outputs
+
+        vocab_size = logits.shape[-1]
+        logits = logits[:, start_regress:, :].reshape(-1, vocab_size)
+        targets = targets.reshape(-1)
+        loss_ntp = F.cross_entropy(logits, targets, ignore_index=-100)
+
+        # Register embedding loss
+        reg_hidden = last_hidden_state[:, start_regress, :]
+        reg_projected = self.conclusion_proj(reg_hidden)
+        cos_sim = F.cosine_similarity(reg_projected, conclusion_embeds, dim=-1)
+        loss_reg = (1 - cos_sim).mean()
+
+        loss = loss_ntp + self.alpha * loss_reg
+
+        if verbose:
+            # NTP accuracy (includes prefix→x1 prediction)
+            ntp_preds = logits.argmax(dim=-1)
+            ntp_mask = (targets != -100)
+            ntp_correct = (ntp_preds[ntp_mask] == targets[ntp_mask]).float().sum()
+            ntp_total = ntp_mask.sum().item()
+
+            return {
+                "loss": loss,
+                "loss_ntp": loss_ntp,
+                "loss_reg": loss_reg,
+                "ntp_correct": ntp_correct,
+                "ntp_total": ntp_total,
+            }
+
+        return {"loss": loss, "loss_ntp": loss_ntp, "loss_reg": loss_reg}
+
