@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .salmonn import SALMONN, CoTSALMONN, MutorSALMONN, MutorBERTSummarySALMONN, MutorBERTConclusionSALMONN, ReverseSALMONN
+from .salmonn import *
 
 def load_model(config):
     model_type = config.get("model_type", "salmonn")
@@ -28,5 +28,7 @@ def load_model(config):
         return MutorBERTSummarySALMONN.from_config(config)
     elif model_type == "mutor_bert_conclusion":
         return MutorBERTConclusionSALMONN.from_config(config)
+    elif model_type == "mutor_bert_triplet_loss":
+        return MutorBERTTripletLossSALMONN.from_config(config)
     else:
         raise ValueError(f"Invalid model type: {model_type}")
