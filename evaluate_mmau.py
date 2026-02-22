@@ -301,7 +301,7 @@ def main():
                 # Strategy 4: Fallback to full output
                 if not conclusion:
                     conclusion = hyp_clean
-                    tqdm.write(f"[Fallback] Using full output: {conclusion[:100]}...")
+                    tqdm.write(f"[Fallback] Using full output: {conclusion}...")
                 
                 results.append({
                     "id": uid,
