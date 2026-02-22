@@ -1770,7 +1770,7 @@ class MutorBERTTripletLossSALMONN(MutorSALMONN):
             correct_option_text = match.group(1).strip()
 
             # Extract the options text (handle missing delimiter, e.g. different dataset formats)
-            _parts = samples["question"][i].split("Choose the correct option from the following options:")
+            _parts = samples["question"][i].split("Choose one among the following options:")
             question_text = _parts[1] if len(_parts) > 1 else ""
             options_text = [
                 re.sub(r"^\([A-Za-z]\)\s*", "", line.strip()).replace(".", "").strip()
