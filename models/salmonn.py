@@ -1767,7 +1767,7 @@ class MutorBERTTripletLossSALMONN(MutorSALMONN):
 
             # Extract the correct option text
             match = re.search(rf"<CONCLUSION>(.*?)</CONCLUSION>", t, re.DOTALL)
-            correct_option_text = match.group(1).strip()
+            correct_option_text = re.sub(r"^\([A-Za-z]\)\s*", "", match.group(1).strip()).replace(".", "").strip()
 
             # Extract the options text (handle missing delimiter, e.g. different dataset formats)
             _parts = samples["question"][i].split("Choose one among the following options:")
