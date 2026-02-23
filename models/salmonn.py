@@ -1779,7 +1779,7 @@ class MutorBERTTripletLossSALMONN(MutorSALMONN):
             ]
 
             # Remove the correct option from the options text
-            options_text = [option for option in options_text if option != correct_option_text]
+            options_text = [option for option in options_text if option != correct_option_text][:3]
 
             # Batch BERT encoding for the correct option and options texts
             encoded = self.conclusion_tokenizer(
