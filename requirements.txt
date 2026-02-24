@@ -12,3 +12,4 @@ gradio==6.2.0
 omegaconf==2.3.0
 tensorboardX==2.6.4
 jiwer>=3.0.0
+matplotlib==3.10.8

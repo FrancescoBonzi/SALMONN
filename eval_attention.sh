@@ -63,6 +63,7 @@ echo "Visualizing attention for YouTube8M..."
 python visualize_attention.py \
     --cfg-path recipes/afthink/$model_type.yaml \
     --options \
+    model.ckpt="$BEST_CKPT" \
     model.llama_path="$SLURM_TMPDIR/pretrained/vicuna-13b-v1.1" \
     model.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
     model.beats_path="$SLURM_TMPDIR/pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" \

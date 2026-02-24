@@ -3,7 +3,6 @@
 Visualize attention maps for MutorBERTConclusionSALMONN.
 
 Usage:
-  # Or with python directly
   python visualize_attention.py --cfg-path recipes/afthink/debug.yaml
 """
 
@@ -174,15 +173,16 @@ def main():
     parser.add_argument("--cfg-path", type=str, required=True, help="Path to config YAML")
     parser.add_argument("--output-dir", type=str, default=None, help="Output directory for figures")
     parser.add_argument("--layers", type=str, default=None, help="Comma-separated layer indices, e.g. 0,15,31")
-    parser.add_argument("options", nargs="*", help="Config overrides, e.g. model.model_type=mutor_bert_conclusion")
+    parser.add_argument(
+        "--options",
+        nargs="*",
+        default=[],
+        help="Config overrides in key=value format, e.g. model.ckpt=path/to/ckpt.pth",
+    )
+
     args = parser.parse_args()
-
-    # Load config
-    class Args:
-        cfg_path = args.cfg_path
-        options = args.options or []
-
-    cfg = Config(Args())
+    cfg = Config(args)
+    
     model_config = cfg.config.model
     data_config = cfg.config.datasets
 
