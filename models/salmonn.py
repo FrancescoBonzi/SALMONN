@@ -330,7 +330,7 @@ class SALMONN(nn.Module):
         else:
             return embeds, atts
 
-    def forward(self, samples, verbose=False):
+    def forward(self, samples, verbose=False, output_attentions=False):
         # detect whether there are multi tasks in this batch
         task = list(set(samples["task"]))
         if len(task) > 1 or "QA" in task:
@@ -407,6 +407,7 @@ class SALMONN(nn.Module):
                 attention_mask=attention_mask,
                 return_dict=True,
                 labels=targets,
+                output_attentions=output_attentions,
             )
             loss = outputs.loss
 
@@ -421,7 +422,17 @@ class SALMONN(nn.Module):
         if verbose:
             return {"loss": loss, "correct": correct, "total": total}
 
-        return {"loss": loss}
+        out = {"loss": loss}
+        if output_attentions:
+            out["attentions"] = torch.stack(outputs.attentions, dim=0)
+            mask_4d = attention_mask.unsqueeze(1).unsqueeze(2).bool()
+            out["attentions_meta"] = {
+                "to_regress_tokens": to_regress_tokens.input_ids,
+                "start_regress": atts_bos.shape[1] + speech_embeds.shape[1],
+                "speech_len": speech_embeds.shape[1],
+                "mask_4d": ~torch.tril(mask_4d.repeat(1, 1, mask_4d.shape[-1], 1)),
+            }
+        return out
 
     def generate(self, samples, generate_cfg, prompts=None):
         batch_size = samples["spectrogram"].shape[0]
@@ -1533,7 +1544,7 @@ class MutorBERTConclusionSALMONN(MutorSALMONN):
             384, # BERT embedding size
         )
 
-    def forward(self, samples, verbose=False):
+    def forward(self, samples, verbose=False, output_attentions=False):
         if not self.training:
             return super(MutorSALMONN, self).forward(samples, verbose)
 
@@ -1664,10 +1675,12 @@ class MutorBERTConclusionSALMONN(MutorSALMONN):
                 return_dict=True,
                 labels=None,
                 output_hidden_states=True,
+                output_attentions=output_attentions,
                 use_cache=False,
             )
             logits = outputs.logits
             last_hidden_state = outputs.hidden_states[-1]
+            attentions = outputs.attentions if output_attentions else None
             del outputs
 
         vocab_size = logits.shape[-1]
@@ -1690,15 +1703,26 @@ class MutorBERTConclusionSALMONN(MutorSALMONN):
             ntp_correct = (ntp_preds[ntp_mask] == targets[ntp_mask]).float().sum()
             ntp_total = ntp_mask.sum().item()
 
-            return {
+            out = {
                 "loss": loss,
                 "loss_ntp": loss_ntp,
                 "loss_reg": loss_reg,
                 "ntp_correct": ntp_correct,
                 "ntp_total": ntp_total,
             }
+        else:
+            out = {"loss": loss, "loss_ntp": loss_ntp, "loss_reg": loss_reg}
 
-        return {"loss": loss, "loss_ntp": loss_ntp, "loss_reg": loss_reg}
+        if output_attentions:
+            out["attentions"] = torch.stack(attentions, dim=0)
+            out["attentions_meta"] = {
+                "to_regress_tokens": to_regress_tokens.input_ids,
+                "start_regress": start_regress,
+                "speech_len": speech_embeds.shape[1],
+                "mask_4d": mask_4d.bool(),
+            }
+        
+        return out
 
 
 class MutorBERTTripletLossSALMONN(MutorSALMONN):
