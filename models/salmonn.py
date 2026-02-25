@@ -1683,18 +1683,18 @@ class MutorBERTConclusionSALMONN(MutorSALMONN):
             attentions = outputs.attentions if output_attentions else None
             del outputs
 
-        vocab_size = logits.shape[-1]
-        logits = logits[:, start_regress-1:, :].reshape(-1, vocab_size)
-        targets = torch.cat([torch.full((batch_size, 1), 529, device=device, dtype=torch.long), targets], dim=1).reshape(-1)
-        loss_ntp = F.cross_entropy(logits, targets, ignore_index=-100)
+            vocab_size = logits.shape[-1]
+            logits = logits[:, start_regress-1:, :].reshape(-1, vocab_size)
+            targets = torch.cat([torch.full((batch_size, 1), 529, device=device, dtype=torch.long), targets], dim=1).reshape(-1)
+            loss_ntp = F.cross_entropy(logits, targets, ignore_index=-100)
 
-        # Register embedding loss
-        reg_hidden = last_hidden_state[:, start_regress, :]
-        reg_projected = self.conclusion_proj(reg_hidden)
-        cos_sim = F.cosine_similarity(reg_projected, conclusion_embeds, dim=-1)
-        loss_reg = (1 - cos_sim).mean()
+            # Register embedding loss
+            reg_hidden = last_hidden_state[:, start_regress, :]
+            reg_projected = self.conclusion_proj(reg_hidden)
+            cos_sim = F.cosine_similarity(reg_projected, conclusion_embeds, dim=-1)
+            loss_reg = (1 - cos_sim).mean()
 
-        loss = loss_ntp + self.alpha * loss_reg
+            loss = loss_ntp + self.alpha * loss_reg
 
         if verbose:
             # NTP accuracy (includes prefix→x1 prediction)
@@ -1894,27 +1894,27 @@ class MutorBERTTripletLossSALMONN(MutorSALMONN):
             last_hidden_state = outputs.hidden_states[-1]
             del outputs
 
-        vocab_size = logits.shape[-1]
-        logits = logits[:, start_regress-1:, :].reshape(-1, vocab_size)
-        targets = torch.cat([torch.full((batch_size, 1), 529, device=device, dtype=torch.long), targets], dim=1).reshape(-1)
-        loss_ntp = F.cross_entropy(logits, targets, ignore_index=-100)
+            vocab_size = logits.shape[-1]
+            logits = logits[:, start_regress-1:, :].reshape(-1, vocab_size)
+            targets = torch.cat([torch.full((batch_size, 1), 529, device=device, dtype=torch.long), targets], dim=1).reshape(-1)
+            loss_ntp = F.cross_entropy(logits, targets, ignore_index=-100)
 
-        # Register contrastive loss
-        reg_hidden = last_hidden_state[:, start_regress, :]
-        reg_projected = F.normalize(self.conclusion_proj(reg_hidden), p=2, dim=-1)
-        pos_embed = option_embeds[:, 0, :]
-        sim_pos = (reg_projected * pos_embed).sum(dim=-1)
-        tau = 0.07
-        loss_reg = 0.0
-        for i in range(batch_size):
-            n = num_options_per_sample[i]
-            neg_embeds = option_embeds[i, 1:n, :]
-            sim_neg = (reg_projected[i : i + 1] * neg_embeds).sum(dim=-1)
-            logits_reg = torch.cat([sim_pos[i : i + 1] / tau, sim_neg / tau]).unsqueeze(0)
-            loss_reg = loss_reg + F.cross_entropy(logits_reg, torch.zeros(1, dtype=torch.long, device=device))
-        loss_reg = loss_reg / batch_size
+            # Register contrastive loss
+            reg_hidden = last_hidden_state[:, start_regress, :]
+            reg_projected = F.normalize(self.conclusion_proj(reg_hidden), p=2, dim=-1)
+            pos_embed = option_embeds[:, 0, :]
+            sim_pos = (reg_projected * pos_embed).sum(dim=-1)
+            tau = 0.07
+            loss_reg = 0.0
+            for i in range(batch_size):
+                n = num_options_per_sample[i]
+                neg_embeds = option_embeds[i, 1:n, :]
+                sim_neg = (reg_projected[i : i + 1] * neg_embeds).sum(dim=-1)
+                logits_reg = torch.cat([sim_pos[i : i + 1] / tau, sim_neg / tau]).unsqueeze(0)
+                loss_reg = loss_reg + F.cross_entropy(logits_reg, torch.zeros(1, dtype=torch.long, device=device))
+            loss_reg = loss_reg / batch_size
 
-        loss = loss_ntp + self.alpha * loss_reg
+            loss = loss_ntp + self.alpha * loss_reg
 
         if verbose:
             # NTP accuracy (includes prefix→x1 prediction)
