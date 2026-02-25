@@ -118,8 +118,8 @@ def plot_attention_heatmaps(
     num_layers = conclusion_attentions.shape[0]
     vmin, vmax = 0.9, 1.1
 
-    c = conclusion_attentions.detach().cpu().numpy()
-    r = register_attentions.detach().cpu().numpy()
+    c = conclusion_attentions.detach().float().cpu().numpy()
+    r = register_attentions.detach().float().cpu().numpy()
 
     # Conclusion attention per layer
     fig, ax = plt.subplots(figsize=(max(8, num_layers * 0.4), 4))
