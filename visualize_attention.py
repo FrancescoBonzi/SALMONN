@@ -12,6 +12,7 @@ import os
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 from config import Config
 from models import load_model
@@ -208,7 +209,7 @@ def main():
     sum_register = None
     num_batches = 0
 
-    for batch in loader:
+    for batch in tqdm(loader, desc="Extracting attention"):
         for k, v in batch.items():
             if isinstance(v, torch.Tensor):
                 batch[k] = v.to(device)
