@@ -28,6 +28,8 @@ def load_model(config):
         return MutorBERTSummarySALMONN.from_config(config)
     elif model_type == "mutor_bert_conclusion":
         return MutorBERTConclusionSALMONN.from_config(config)
+    elif model_type == "mutor_bert_multi_conclusion":
+        return MutorBERTMultiConclusionSALMONN.from_config(config)
     elif model_type == "mutor_bert_triplet_loss":
         return MutorBERTTripletLossSALMONN.from_config(config)
     else:
