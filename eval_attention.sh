@@ -16,6 +16,9 @@ seed=${seeds[$SLURM_ARRAY_TASK_ID]}
 
 # Define config variables
 model_type="salmonn"
+ckpt_type="finetuned"
+prompt_type="afthink"
+output_dir="${model_type}_13B_${ckpt_type}_${prompt_type}prompt/seed${seed}/"
 
 # Copy data to SLURM_TMPDIR for fast I/O
 echo "Copying data to SLURM_TMPDIR..."
@@ -53,8 +56,8 @@ module load httpproxy
 source .venv/bin/activate
 
 # Find the output directory
-OUTPUT_DIR=$(ls -dt outputs/afthink_youtube8m/$model_type/$seed/* | head -n 1)
-BEST_CKPT="${OUTPUT_DIR}/checkpoint_best.pth"
+CKPT_DIR=$(ls -dt outputs/afthink_youtube8m/$model_type/$seed/* | head -n 1)
+BEST_CKPT="${CKPT_DIR}/checkpoint_best.pth"
 
 echo "Using checkpoint: $BEST_CKPT"
 
@@ -69,6 +72,7 @@ python visualize_attention.py \
     model.beats_path="$SLURM_TMPDIR/pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" \
     datasets.valid_ann_path="$SLURM_TMPDIR/data/YouTube8M/annotations/test_youtube8m.json" \
     datasets.whisper_path="$SLURM_TMPDIR/pretrained/whisper-large-v2" \
+    run.output_dir="$output_dir" \
     run.seed="$seed" \
     run.num_workers="$SLURM_CPUS_PER_TASK"
 
