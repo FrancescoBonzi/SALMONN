@@ -32,6 +32,8 @@ def load_model(config):
         return MutorBERTMultiConclusionSALMONN.from_config(config)
     elif model_type == "caption_attention_salmonn":
         return CaptionAttentionSALMONN.from_config(config)
+    elif model_type == "chapter_attention_salmonn":
+        return ChapterAttentionSALMONN.from_config(config)
     elif model_type == "mutor_bert_triplet_loss":
         return MutorBERTTripletLossSALMONN.from_config(config)
     else:
