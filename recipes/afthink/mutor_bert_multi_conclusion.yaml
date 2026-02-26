@@ -77,7 +77,7 @@ run:
     beta2: 0.999
 
 generate:
-  max_new_tokens: 400
+  max_new_tokens: 300
   num_beams: 4
   do_sample: False
   min_length: 1
