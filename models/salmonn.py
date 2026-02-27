@@ -655,6 +655,114 @@ class CoTSALMONN(SALMONN):
         return {"loss": loss}
 
 
+class ConclusionFocusSALMONN(SALMONN):
+    CHAPTER_SPECIAL_TOKENS = [
+        "<SUMMARY>", "</SUMMARY>",
+        "<CAPTION>", "</CAPTION>",
+        "<REASONING>", "</REASONING>",
+        "<CONCLUSION>", "</CONCLUSION>",
+    ]
+    def __init__(self, alpha_max=5.0, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.alpha_max = alpha_max
+        self.llama_tokenizer.add_special_tokens({"additional_special_tokens": self.CHAPTER_SPECIAL_TOKENS})
+        self.llama_model.resize_token_embeddings(len(self.llama_tokenizer))
+        
+    def forward(self, samples, verbose=False):
+        # detect whether there are multi tasks in this batch
+        task = list(set(samples["task"]))
+        if len(task) > 1 or "QA" in task:
+            self.multi_prompt = True
+
+        # prepare prompts
+        if self.prompt_dict:
+            if self.multi_prompt:
+                prompt = [random.choice(self.prompt_dict[task]) for task in samples["task"]]
+                if "Q" in samples:
+                    prompt = [p.format(q) if '{}' in p else p for p, q in zip(prompt, samples["Q"]) ]
+            else:
+                prompt = random.choice(self.prompt_dict[samples["task"][0]])
+
+            # For reasoning tasks, concatenate question + prompt
+            if "question" in samples and any(samples["question"]):
+                if not self.multi_prompt:
+                    prompt = [prompt] * len(samples["question"])
+                    self.multi_prompt = True
+                prompt = [q + " " + p for p, q in zip(prompt, samples["question"])]
+
+        # use speech/audio encoder to encode speech/audio
+        spectrogram = samples["spectrogram"]
+        raw_wav = samples.get("raw_wav", None)
+        audio_padding_mask = samples.get("padding_mask", None)
+
+        speech_embeds, speech_atts = self.encode_speech(spectrogram, raw_wav=raw_wav, audio_padding_mask=audio_padding_mask)
+
+        # wrap speech_embeds with prompts (includes question for reasoning tasks)
+        if self.prompt_dict:
+            speech_embeds, speech_atts = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt)
+
+        # prepare inputs for LLM (use answer for reasoning tasks, text for ASR)
+        if "answer" in samples and any(samples["answer"]):
+            text = [t + self.end_sym for t in samples["answer"]]
+        else:
+            text = [t + self.end_sym for t in samples["text"]]
+        to_regress_tokens = self.llama_tokenizer(
+            text,
+            return_tensors="pt",
+            padding="longest",
+            truncation=True,
+            max_length=self.max_txt_len,
+            add_special_tokens=False
+        ).to(spectrogram.device)
+
+        batch_size = to_regress_tokens.input_ids.shape[0]
+        device = to_regress_tokens.input_ids.device
+        bos = torch.ones(
+            [batch_size, 1],
+            dtype=to_regress_tokens.input_ids.dtype,
+            device=device,
+        ) * self.llama_tokenizer.bos_token_id
+        bos_embeds = self.llama_model.model.embed_tokens(bos) if not self.lora else self.llama_model.model.model.embed_tokens(bos)
+        atts_bos = speech_atts[:, :1]
+
+        start_regress = bos_embeds.shape[1] + speech_embeds.shape[1]
+
+        # Build the conclusion mask
+        start_conclusion_mask = to_regress_tokens.input_ids == self.llama_tokenizer.convert_tokens_to_ids("<CONCLUSION>")
+        end_conclusion_mask = to_regress_tokens.input_ids == self.llama_tokenizer.convert_tokens_to_ids("</CONCLUSION>")
+        conclusion_mask = (torch.cumsum(start_conclusion_mask, dim=1) - torch.cumsum(end_conclusion_mask, dim=1))
+        conclusion_mask = torch.cat([torch.zeros((batch_size, 1), device=device, dtype=torch.bool), conclusion_mask], dim=1).bool()
+
+        to_regress_embeds = self.llama_model.model.embed_tokens(to_regress_tokens.input_ids) if not self.lora else self.llama_model.model.model.embed_tokens(to_regress_tokens.input_ids)
+        targets = to_regress_tokens.input_ids.masked_fill(
+            to_regress_tokens.input_ids == self.llama_tokenizer.pad_token_id, -100
+        ).roll(-1, dims=1)
+        targets[:, -1] = -100
+        targets = torch.cat([529 * torch.ones((batch_size, 1), device=device, dtype=to_regress_tokens.input_ids.dtype), targets], dim=1)
+
+        inputs_embeds = torch.cat([bos_embeds, speech_embeds, to_regress_embeds], dim=1)
+        attention_mask = torch.cat([atts_bos, speech_atts, to_regress_tokens.attention_mask], dim=1)
+
+        # calulate loss
+        with self.maybe_autocast():
+            outputs = self.llama_model(
+                inputs_embeds=inputs_embeds,
+                attention_mask=attention_mask,
+                return_dict=True,
+                labels=None,
+                use_cache=False,
+            )
+            logits = outputs.logits[:, start_regress-1:, :]
+
+            loss_conclusion = F.cross_entropy(logits[conclusion_mask, :], targets[conclusion_mask], ignore_index=-100)
+            loss_other_chapters = F.cross_entropy(logits[~conclusion_mask, :], targets[~conclusion_mask], ignore_index=-100)
+
+            alpha = random.uniform(1.0, self.alpha_max)
+            loss = alpha * loss_conclusion + loss_other_chapters
+
+        return {"loss": loss}
+
+
 class ReverseSALMONN(SALMONN):
     def __init__(self, alpha=1.0, reverse_prob=0.5, *args, **kwargs):
         super().__init__(*args, **kwargs)

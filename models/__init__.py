@@ -20,6 +20,8 @@ def load_model(config):
         return SALMONN.from_config(config)
     elif model_type == "cot_salmonn":
         return CoTSALMONN.from_config(config)
+    elif model_type == "conclusion_focus_salmonn":
+        return ConclusionFocusSALMONN.from_config(config)
     elif model_type == "reverse_salmonn":
         return ReverseSALMONN.from_config(config)
     elif model_type == "mutor":
