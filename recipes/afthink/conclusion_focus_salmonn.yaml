@@ -1,10 +1,6 @@
 model:
   model_type: "conclusion_focus_salmonn"
 
-  # ConclusionFocusSALMONN hyperparameters
-  alpha_min: 0.1
-  alpha_max: 2.0
-
   # Model paths (download with: python recipes/download_pretrained.sh)
   llama_path: "pretrained/vicuna-13b-v1.1"
   whisper_path: "pretrained/whisper-large-v2"
