@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from .salmonn import *
+from .qwen import Qwen25Omni, MutorBERTConclusionQwen25Omni
 
 def load_model(config):
     model_type = config.get("model_type", "salmonn")
@@ -38,5 +39,9 @@ def load_model(config):
         return ChapterAttentionSALMONN.from_config(config)
     elif model_type == "mutor_bert_triplet_loss":
         return MutorBERTTripletLossSALMONN.from_config(config)
+    elif model_type == "qwen25_omni":
+        return Qwen25Omni.from_config(config)
+    elif model_type == "qwen25_omni_mutor_bert_conclusion":
+        return MutorBERTConclusionQwen25Omni.from_config(config)
     else:
         raise ValueError(f"Invalid model type: {model_type}")

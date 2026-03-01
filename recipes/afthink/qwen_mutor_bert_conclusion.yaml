@@ -1,0 +1,72 @@
+# MuToR BERT Conclusion Training Config for Qwen2.5-Omni
+#
+# Usage:
+#   python train_qwen2audio.py --cfg-path recipes/qwen2audio/mutor_bert_conclusion.yaml
+
+model:
+  model_type: "qwen25_omni_mutor_bert_conclusion"
+
+  # Qwen2.5-Omni model path (HuggingFace hub or local)
+  qwen25_omni_path: "Qwen/Qwen2.5-Omni-7B"
+
+  # MuToR hyperparameters
+  mutor_alpha: 1.0
+
+  freeze_audio_tower: True
+  freeze_visual: True
+
+  # LoRA (efficient fine-tuning of text model)
+  lora: True
+  lora_rank: 8
+  lora_alpha: 32
+  lora_dropout: 0.1
+
+  max_txt_len: 400
+
+  # Optional: path to a previously saved checkpoint
+  ckpt: ""
+
+datasets:
+  train_ann_path: ""  # path to training annotation JSON
+  valid_ann_path: ""  # path to validation annotation JSON
+  test_ann_path: ""   # path to test annotation JSON
+
+  # Whisper feature extractor path (uses the one bundled with Qwen2.5-Omni by default)
+  whisper_path: "Qwen/Qwen2.5-Omni-7B"
+
+run:
+  seed: 42
+  output_dir: "outputs/qwen25omni_mutor_bert_conclusion"
+  evaluate: False
+  save_only_best: True
+
+  log_freq: 10
+  epoch_based: False
+  iters_per_epoch: 4000
+  accum_grad_iters: 8
+  batch_size_train: 2
+  batch_size_eval: 4
+  num_workers: 4
+
+  device: "cuda"
+  use_distributed: True
+  amp: True
+  world_size: 1
+  dist_url: "env://"
+
+  optims:
+    max_epoch: 10
+    warmup_steps: 1000
+    warmup_start_lr: 1.0e-6
+    init_lr: 2.0e-5
+    min_lr: 1.0e-6
+    weight_decay: 0.05
+    beta2: 0.999
+
+generate:
+  max_new_tokens: 300
+  num_beams: 4
+  do_sample: False
+  temperature: 1.0
+  top_p: 0.9
+  repetition_penalty: 1.0
