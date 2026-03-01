@@ -120,6 +120,12 @@ def main():
 
     args = parser.parse_args()
     cfg = Config(args)
+
+    # Set output directory and path
+    output_dir = cfg.config.run.output_dir if args.output_dir is None else args.output_dir
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "attention_metrics.json")
+    print(f"Saving attention metrics to {output_path}")
     
     model_config = cfg.config.model
     data_config = cfg.config.datasets
@@ -176,8 +182,6 @@ def main():
         print("No batches with attentions. Exiting.")
         return
 
-    output_dir = cfg.config.run.output_dir if args.output_dir is None else args.output_dir
-    os.makedirs(output_dir, exist_ok=True)
     # Save summarized metrics as JSON
     metrics = {
         "regress_sequence_attention": {
@@ -187,9 +191,10 @@ def main():
             "excess_over_uniform": float(register_sum_attentions),
         },
     }
-    with open(os.path.join(output_dir, "attention_metrics.json"), "w") as f:
+    with open(output_path, "w") as f:
         json.dump(metrics, f, indent=2)
     print(f"Saved attention metrics ({num_batches} batches)")
+    print(f"Saved attention metrics to {output_path}")
 
 
 if __name__ == "__main__":
