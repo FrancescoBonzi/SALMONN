@@ -231,10 +231,10 @@ class Qwen25Omni(nn.Module):
         )
 
         # 3D position IDs for TMRoPE: (3, B, total_len)
-        prompt_position_ids = (
-            torch.arange(prompt_len, device=device).unsqueeze(0).expand(batch_size, -1)
-        )
-        target_position_ids = torch.cumsum(target_attn, dim=1) + prompt_len - 1
+        prompt_position_ids = torch.cumsum(prompt_attn, dim=1) - 1
+        prompt_position_ids = prompt_position_ids.clamp(min=0)
+        last_valid_prompt_pos = (prompt_attn.sum(dim=1) - 1).clamp(min=0).unsqueeze(1)
+        target_position_ids = torch.cumsum(target_attn, dim=1) + last_valid_prompt_pos
         position_ids_1d = torch.cat(
             [prompt_position_ids, target_position_ids], dim=1
         )
@@ -586,10 +586,10 @@ class MutorBERTConclusionQwen25Omni(Qwen25Omni):
         )
 
         # 3D position IDs for TMRoPE: (3, B, total_len)
-        prompt_position_ids = (
-            torch.arange(prompt_len, device=device).unsqueeze(0).expand(batch_size, -1)
-        )
-        target_position_ids = torch.cumsum(target_attn, dim=1) + prompt_len - 1
+        prompt_position_ids = torch.cumsum(prompt_attn, dim=1) - 1
+        prompt_position_ids = prompt_position_ids.clamp(min=0)
+        last_valid_prompt_pos = (prompt_attn.sum(dim=1) - 1).clamp(min=0).unsqueeze(1)
+        target_position_ids = torch.cumsum(target_attn, dim=1) + last_valid_prompt_pos
         position_ids_1d = torch.cat(
             [prompt_position_ids, target_position_ids], dim=1
         )
