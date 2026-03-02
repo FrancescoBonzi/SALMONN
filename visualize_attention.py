@@ -18,24 +18,29 @@ from dataset import SALMONNDataset
 from torch.utils.data import DataLoader
 
 
-def _attention_rollout(full_attentions: torch.Tensor, mask_4d: torch.Tensor) -> torch.Tensor:
+def _attention_rollout(
+    full_attentions: torch.Tensor,
+    active_positions: torch.Tensor,
+    use_residual: bool = True,
+) -> torch.Tensor:
     """
     Compute attention rollout per Abnar & Zuidema (2020) https://arxiv.org/pdf/2005.00928.
-    A = 0.5*W_att + 0.5*I (residual), then rollout = A_L @ A_{L-1} @ ... @ A_1.
+    With residual: A = 0.5*W_att + 0.5*I. Without: A = W_att.
+    Rollout = A_L @ A_{L-1} @ ... @ A_1.
     """
-    active_positions = 1.0 - mask_4d[:, 0, :, :].float()
     add_mask = torch.where(active_positions > 0.5, 0.0, float(torch.finfo(active_positions.dtype).min))
     attentions = full_attentions.mean(dim=2)
     seq_len = attentions.shape[-1]
     device, dtype = attentions.device, attentions.dtype
 
-    # Consider skip-connections
-    I = torch.eye(seq_len, device=device, dtype=dtype)
-    I = I.unsqueeze(0).unsqueeze(0).expand(attentions.shape[0], attentions.shape[1], -1, -1)
-    A = 0.5 * attentions + 0.5 * I
+    if use_residual:
+        I = torch.eye(seq_len, device=device, dtype=dtype)
+        I = I.unsqueeze(0).unsqueeze(0).expand(attentions.shape[0], attentions.shape[1], -1, -1)
+        A = 0.5 * attentions + 0.5 * I
+    else:
+        A = attentions
     A = torch.softmax(A + add_mask.unsqueeze(0), dim=-1)
 
-    # Rollout
     rollout = A[0]
     for l in range(1, A.shape[0]):
         rollout = torch.matmul(rollout, A[l])
@@ -43,36 +48,68 @@ def _attention_rollout(full_attentions: torch.Tensor, mask_4d: torch.Tensor) -> 
     return rollout
 
 
+def _excess_over_uniform(
+    attention_slice: torch.Tensor,
+    active_slice: torch.Tensor,
+    start_speech: int,
+    speech_end: int,
+) -> torch.Tensor:
+    """Excess over uniform. attention_slice: (..., num_rows, speech_len), active_slice: (..., num_rows, seq_len)."""
+    actual = attention_slice.sum(dim=-1)
+    num_valid_keys = active_slice.sum(dim=-1).clamp(min=1)
+    num_valid_speech = active_slice[..., start_speech:speech_end].sum(dim=-1)
+    expected = num_valid_speech / num_valid_keys
+    return (actual - expected).mean()
+
+
+def _extract_from_rollout(
+    rollout_attention: torch.Tensor,
+    active_positions: torch.Tensor,
+    start_regress: int,
+    start_speech: int,
+    speech_end: int,
+) -> torch.Tensor:
+    """Excess over uniform for regress sequence."""
+    to_regress_attention = rollout_attention[:, start_regress:, start_speech:speech_end]
+    active_regress = active_positions[:, start_regress:, :]
+    return _excess_over_uniform(to_regress_attention, active_regress, start_speech, speech_end)
+
+
+def _raw_attention(
+    full_attentions: torch.Tensor,
+    active_positions: torch.Tensor,
+    layer_idx: int,
+) -> torch.Tensor:
+    """Raw attention from a single layer. layer_idx: 0 for first, -1 for last."""
+    add_mask = torch.where(active_positions > 0.5, 0.0, float(torch.finfo(active_positions.dtype).min))
+    attentions = full_attentions.mean(dim=2)
+    att = attentions[layer_idx]
+    return torch.softmax(att + add_mask, dim=-1)
+
+
 def extract_regress_sequence_attentions(
     full_attentions: torch.Tensor,
     mask_4d: torch.Tensor,
     start_regress: int,
     start_speech: int,
-    speech_len: int,
+    speech_end: int,
+    use_residual: bool = True,
+    attention_map: torch.Tensor = None,
 ) -> torch.Tensor:
     """
     Extract the attention the sequence to regress put on the speech tokens.
-    Returns excess over uniform: (actual - expected) / expected, where expected
-    is the attention to speech under uniform distribution over valid keys.
-    Value of 0 = uniform, >0 = more attention to speech than chance.
+    Returns excess over uniform. If attention_map is provided, use it; else compute rollout.
     """
     active_positions = 1.0 - mask_4d[:, 0, :, :].float()
-    rollout_attention = _attention_rollout(full_attentions, mask_4d)
+    if attention_map is not None:
+        return _extract_from_rollout(
+            attention_map, active_positions, start_regress, start_speech, speech_end
+        )
+    rollout_attention = _attention_rollout(full_attentions, active_positions, use_residual=use_residual)
+    return _extract_from_rollout(
+        rollout_attention, active_positions, start_regress, start_speech, speech_end
+    )
 
-    # Extract the attention for the speech tokens (positions [start_speech, start_speech+speech_len))
-    to_regress_attention = rollout_attention[:, start_regress:, start_speech : start_speech + speech_len]
-
-    # Compute excess over uniform
-    actual = to_regress_attention.sum(dim=-1)
-    num_valid_keys = active_positions[:, start_regress:, :].sum(dim=-1).clamp(min=1)
-    num_valid_speech = active_positions[:, start_regress:, start_speech : start_speech + speech_len].sum(dim=-1)
-    expected = num_valid_speech / num_valid_keys
-    # Only include positions where we have valid speech keys to avoid degenerate cases
-    valid_mask = num_valid_speech > 0
-    if valid_mask.any():
-        excess = (actual - expected) / expected.clamp(min=1e-6)
-        return excess[valid_mask].mean()
-    return torch.tensor(0.0, device=rollout_attention.device, dtype=rollout_attention.dtype)
 
 def extract_register_attentions(
     reg_token_id: int,
@@ -80,36 +117,35 @@ def extract_register_attentions(
     to_regress_tokens: torch.Tensor,
     mask_4d: torch.Tensor,
     start_regress: int,
-    speech_len: int,
+    start_speech: int,
+    speech_end: int,
+    use_residual: bool = True,
+    attention_map: torch.Tensor = None,
 ) -> torch.Tensor:
     """
     Extract the attention the registers have on the speech tokens.
-    Returns excess over uniform: (actual - expected) / expected, where expected
-    is the attention to speech under uniform distribution over valid keys.
-    Value of 0 = uniform, >0 = more attention to speech than chance.
+    Returns excess over uniform. If attention_map is provided, use it; else compute rollout.
     """
-    start_speech = start_regress - speech_len
     batch_size = to_regress_tokens.shape[0]
     active_positions = 1.0 - mask_4d[:, 0, :, :].float()
-    rollout_attention = _attention_rollout(full_attentions, mask_4d)
+    if attention_map is not None:
+        map_to_use = attention_map
+    else:
+        map_to_use = _attention_rollout(full_attentions, active_positions, use_residual=use_residual)
 
-    # Compute excess over uniform
     register_excess = []
     for i in range(batch_size):
         reg_ids = start_regress + torch.where(to_regress_tokens[i] == reg_token_id)[0]
         if len(reg_ids) == 0:
             continue
-        ra = rollout_attention[i, reg_ids, start_speech : start_speech + speech_len]
-        actual = ra.sum(dim=-1)
-        num_valid_keys = active_positions[i, reg_ids, :].sum(dim=-1).clamp(min=1)
-        num_valid_speech = active_positions[i, reg_ids, start_speech : start_speech + speech_len].sum(dim=-1)
-        expected = num_valid_speech / num_valid_keys
-        valid_mask = num_valid_speech > 0
-        if valid_mask.any():
-            excess = (actual - expected) / expected.clamp(min=1e-6)
-            register_excess.append(excess[valid_mask].mean())
+        att_slice = map_to_use[i : i + 1, reg_ids, start_speech:speech_end]
+        active_slice = active_positions[i : i + 1, reg_ids, :]
+        register_excess.append(_excess_over_uniform(att_slice, active_slice, start_speech, speech_end))
+
+    # Return 0 if no registers were found
     if len(register_excess) == 0:
-        return torch.tensor(0.0, device=rollout_attention.device, dtype=rollout_attention.dtype)
+        return torch.tensor(0.0, device=map_to_use.device, dtype=map_to_use.dtype)
+    
     return torch.stack(register_excess, dim=0).mean()
 
 
@@ -154,10 +190,11 @@ def main():
     )
 
     num_batches = 0
-    regress_sequence_sum = 0.0
-    register_sum = 0.0
-    regress_sequence_count = 0
-    register_count = 0
+    method_keys = ["rollout_residual", "rollout_no_residual", "raw_first_layer", "raw_last_layer"]
+    regress_sequence_sum = {k: 0.0 for k in method_keys}
+    register_sum = {k: 0.0 for k in method_keys}
+    regress_sequence_count = {k: 0 for k in method_keys}
+    register_count = {k: 0 for k in method_keys}
 
     for batch in tqdm(loader, desc="Extracting attention"):
         for k, v in batch.items():
@@ -173,29 +210,66 @@ def main():
 
         meta = output["attentions_meta"]
         batch_size = meta["mask_4d"].shape[0]
-
-        regress_val = extract_regress_sequence_attentions(
-            output["attentions"],
-            meta["mask_4d"],
-            meta["start_regress"],
-            meta["start_speech"],
-            meta["speech_len"]
-        )
-        regress_sequence_sum += float(regress_val) * batch_size
-        regress_sequence_count += batch_size
+        start_regress = meta["start_regress"]
+        speech_len = meta["speech_len"]
+        start_speech = meta["start_speech"]
+        speech_end = min(start_speech + speech_len, start_regress)
 
         to_regress_tokens = meta.get("to_regress_tokens")
-        if to_regress_tokens is not None:
-            register_val = extract_register_attentions(
-                model.llama_tokenizer.convert_tokens_to_ids("<reg>"),
+        active_positions = 1.0 - meta["mask_4d"][:, 0, :, :].float()
+
+        for use_residual, suffix in [(True, "rollout_residual"), (False, "rollout_no_residual")]:
+            regress_val = extract_regress_sequence_attentions(
                 output["attentions"],
-                to_regress_tokens,
                 meta["mask_4d"],
-                meta["start_regress"],
-                meta["speech_len"]
+                start_regress,
+                start_speech,
+                speech_end,
+                use_residual=use_residual,
             )
-            register_sum += float(register_val) * batch_size
-            register_count += batch_size
+            regress_sequence_sum[suffix] += float(regress_val) * batch_size
+            regress_sequence_count[suffix] += batch_size
+
+            if to_regress_tokens is not None:
+                register_val = extract_register_attentions(
+                    model.llama_tokenizer.convert_tokens_to_ids("<reg>"),
+                    output["attentions"],
+                    to_regress_tokens,
+                    meta["mask_4d"],
+                    start_regress,
+                    start_speech,
+                    speech_end,
+                    use_residual=use_residual,
+                )
+                register_sum[suffix] += float(register_val) * batch_size
+                register_count[suffix] += batch_size
+
+        for layer_idx, suffix in [(0, "raw_first_layer"), (-1, "raw_last_layer")]:
+            raw_att = _raw_attention(output["attentions"], active_positions, layer_idx)
+            regress_val = extract_regress_sequence_attentions(
+                output["attentions"],
+                meta["mask_4d"],
+                start_regress,
+                start_speech,
+                speech_end,
+                attention_map=raw_att,
+            )
+            regress_sequence_sum[suffix] += float(regress_val) * batch_size
+            regress_sequence_count[suffix] += batch_size
+
+            if to_regress_tokens is not None:
+                register_val = extract_register_attentions(
+                    model.llama_tokenizer.convert_tokens_to_ids("<reg>"),
+                    output["attentions"],
+                    to_regress_tokens,
+                    meta["mask_4d"],
+                    start_regress,
+                    start_speech,
+                    speech_end,
+                    attention_map=raw_att,
+                )
+                register_sum[suffix] += float(register_val) * batch_size
+                register_count[suffix] += batch_size
 
         num_batches += 1
 
@@ -203,23 +277,18 @@ def main():
         print("No batches with attentions. Exiting.")
         return
 
-    # Average over all batches (weighted by batch size)
-    regress_sequence_mean = regress_sequence_sum / regress_sequence_count if regress_sequence_count > 0 else 0.0
-    register_mean = register_sum / register_count if register_count > 0 else 0.0
-
     # Save summarized metrics as JSON
-    metrics = {
-        "regress_sequence_attention": {
-            "excess_over_uniform": regress_sequence_mean,
-        },
-        "register_attention": {
-            "excess_over_uniform": register_mean,
-        },
-    }
+    metrics = {}
+    for suffix in method_keys:
+        rc = regress_sequence_count[suffix]
+        rcc = register_count[suffix]
+        metrics[suffix] = {
+            "regress_sequence_excess_over_uniform": regress_sequence_sum[suffix] / rc if rc > 0 else 0.0,
+            "register_excess_over_uniform": register_sum[suffix] / rcc if rcc > 0 else 0.0,
+        }
     with open(output_path, "w") as f:
         json.dump(metrics, f, indent=2)
-    print(f"Saved attention metrics ({num_batches} batches)")
-    print(f"Saved attention metrics to {output_path}")
+    print(f"Saved attention metrics ({num_batches} batches) to {output_path}")
 
 
 if __name__ == "__main__":

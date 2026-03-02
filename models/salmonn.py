@@ -328,7 +328,7 @@ class SALMONN(nn.Module):
                 wrapped_atts = torch.cat([p_before_tokens.attention_mask, atts, p_after_tokens.attention_mask], dim=1)
 
             if output_attentions:
-                return wrapped_embeds, wrapped_atts, p_before_tokens.input_ids.shape[1]
+                return wrapped_embeds, wrapped_atts, p_before_tokens.input_ids.shape[1], embeds.shape[1], p_after_tokens.input_ids.shape[1]
             return wrapped_embeds, wrapped_atts
         else:
             return embeds, atts
@@ -365,7 +365,7 @@ class SALMONN(nn.Module):
         # wrap speech_embeds with prompts (includes question for reasoning tasks)
         if self.prompt_dict:
             if output_attentions:
-                speech_embeds, speech_atts, p_before_speech_len = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt, output_attentions=True)
+                speech_embeds, speech_atts, p_before_speech_len, speech_len, p_after_speech_len = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt, output_attentions=True)
             else:
                 speech_embeds, speech_atts = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt)
 
@@ -436,7 +436,8 @@ class SALMONN(nn.Module):
                 "to_regress_tokens": to_regress_tokens.input_ids,
                 "start_regress": atts_bos.shape[1] + speech_embeds.shape[1],
                 "start_speech": 1 + p_before_speech_len,
-                "speech_len": speech_embeds.shape[1],
+                "speech_len": speech_len,
+                "p_after_speech_len": p_after_speech_len,
                 "mask_4d": ~torch.tril(mask_4d.repeat(1, 1, mask_4d.shape[-1], 1)),
             }
         return out
@@ -1700,7 +1701,7 @@ class MutorBERTConclusionSALMONN(MutorSALMONN):
         # wrap speech_embeds with prompts (includes question for reasoning tasks)
         if self.prompt_dict:
             if output_attentions:
-                speech_embeds, speech_atts, p_before_speech_len = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt, output_attentions=True)
+                speech_embeds, speech_atts, p_before_speech_len, speech_len, p_after_speech_len = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt, output_attentions=True)
             else:
                 speech_embeds, speech_atts = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt)
 
@@ -1844,7 +1845,8 @@ class MutorBERTConclusionSALMONN(MutorSALMONN):
                 "to_regress_tokens": to_regress_tokens.input_ids,
                 "start_regress": start_regress,
                 "start_speech": 1 + p_before_speech_len,
-                "speech_len": speech_embeds.shape[1],
+                "speech_len": speech_len,
+                "p_after_speech_len": p_after_speech_len,
                 "mask_4d": mask_4d.bool(),
             }
         
