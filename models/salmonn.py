@@ -335,7 +335,7 @@ class SALMONN(nn.Module):
                 wrapped_atts = torch.cat([p_before_tokens.attention_mask, atts, p_after_tokens.attention_mask], dim=1)
 
             if output_attentions:
-                return wrapped_embeds, wrapped_atts, p_before_tokens.input_ids.shape[1]
+                return wrapped_embeds, wrapped_atts, p_before_tokens.input_ids.shape[1], embeds.shape[1], p_after_tokens.input_ids.shape[1]
             return wrapped_embeds, wrapped_atts
         else:
             return embeds, atts
@@ -372,7 +372,7 @@ class SALMONN(nn.Module):
         # wrap speech_embeds with prompts (includes question for reasoning tasks)
         if self.prompt_dict:
             if output_attentions:
-                speech_embeds, speech_atts, p_before_speech_len = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt, output_attentions=True)
+                speech_embeds, speech_atts, p_before_speech_len, speech_len, p_after_speech_len = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt, output_attentions=True)
             else:
                 speech_embeds, speech_atts = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt)
 
@@ -443,7 +443,8 @@ class SALMONN(nn.Module):
                 "to_regress_tokens": to_regress_tokens.input_ids,
                 "start_regress": atts_bos.shape[1] + speech_embeds.shape[1],
                 "start_speech": 1 + p_before_speech_len,
-                "speech_len": speech_embeds.shape[1],
+                "speech_len": speech_len,
+                "p_after_speech_len": p_after_speech_len,
                 "mask_4d": ~torch.tril(mask_4d.repeat(1, 1, mask_4d.shape[-1], 1)),
             }
         return out
@@ -740,18 +741,17 @@ class ConclusionFocusSALMONN(SALMONN):
 
         start_regress = bos_embeds.shape[1] + speech_embeds.shape[1]
 
-        # Build the conclusion mask
+        # Build the conclusion mask (shape [B, L] to align with logits)
         start_conclusion_mask = to_regress_tokens.input_ids == self.llama_tokenizer.convert_tokens_to_ids("<CONCLUSION>")
         end_conclusion_mask = to_regress_tokens.input_ids == self.llama_tokenizer.convert_tokens_to_ids("</CONCLUSION>")
-        conclusion_mask = (torch.cumsum(start_conclusion_mask, dim=1) - torch.cumsum(end_conclusion_mask, dim=1))
-        conclusion_mask = torch.cat([torch.zeros((batch_size, 1), device=device, dtype=torch.bool), conclusion_mask], dim=1).bool()
+        end_conclusion_mask = torch.cat([torch.zeros((batch_size, 1), device=device, dtype=torch.bool), end_conclusion_mask], dim=1)[:, :-1]
+        conclusion_mask = (torch.cumsum(start_conclusion_mask, dim=1) - torch.cumsum(end_conclusion_mask, dim=1)).bool()
 
         to_regress_embeds = self.llama_model.model.embed_tokens(to_regress_tokens.input_ids) if not self.lora else self.llama_model.model.model.embed_tokens(to_regress_tokens.input_ids)
+        # Targets: logits[i] predicts regress[i], so targets = to_regress_tokens (no roll, no prepend)
         targets = to_regress_tokens.input_ids.masked_fill(
             to_regress_tokens.input_ids == self.llama_tokenizer.pad_token_id, -100
-        ).roll(-1, dims=1)
-        targets[:, -1] = -100
-        targets = torch.cat([529 * torch.ones((batch_size, 1), device=device, dtype=to_regress_tokens.input_ids.dtype), targets], dim=1)
+        )
 
         inputs_embeds = torch.cat([bos_embeds, speech_embeds, to_regress_embeds], dim=1)
         attention_mask = torch.cat([atts_bos, speech_atts, to_regress_tokens.attention_mask], dim=1)
@@ -765,7 +765,7 @@ class ConclusionFocusSALMONN(SALMONN):
                 labels=None,
                 use_cache=False,
             )
-            logits = outputs.logits[:, start_regress-1:, :]
+            logits = outputs.logits[:, start_regress-1:-1, :]
 
             loss_conclusion = F.cross_entropy(logits[conclusion_mask, :], targets[conclusion_mask], ignore_index=-100)
             loss_other_chapters = F.cross_entropy(logits[~conclusion_mask, :], targets[~conclusion_mask], ignore_index=-100)
@@ -1708,7 +1708,7 @@ class MutorBERTConclusionSALMONN(MutorSALMONN):
         # wrap speech_embeds with prompts (includes question for reasoning tasks)
         if self.prompt_dict:
             if output_attentions:
-                speech_embeds, speech_atts, p_before_speech_len = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt, output_attentions=True)
+                speech_embeds, speech_atts, p_before_speech_len, speech_len, p_after_speech_len = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt, output_attentions=True)
             else:
                 speech_embeds, speech_atts = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt)
 
@@ -1852,7 +1852,8 @@ class MutorBERTConclusionSALMONN(MutorSALMONN):
                 "to_regress_tokens": to_regress_tokens.input_ids,
                 "start_regress": start_regress,
                 "start_speech": 1 + p_before_speech_len,
-                "speech_len": speech_embeds.shape[1],
+                "speech_len": speech_len,
+                "p_after_speech_len": p_after_speech_len,
                 "mask_4d": mask_4d.bool(),
             }
         
