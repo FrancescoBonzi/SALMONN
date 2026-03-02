@@ -15,6 +15,7 @@
 import logging
 import json
 import contextlib
+import os
 import random
 import re
 import numpy as np
@@ -108,7 +109,11 @@ class SALMONN(nn.Module):
         self.low_resource = low_resource
 
         logging.info('Loading LLaMA Tokenizer')
-        self.llama_tokenizer = LlamaTokenizer.from_pretrained(llama_path, use_fast=False)
+        # local_files_only=True for local paths to avoid HFValidationError (repo_id format check)
+        _local_only = os.path.isabs(llama_path) or os.path.exists(llama_path)
+        self.llama_tokenizer = LlamaTokenizer.from_pretrained(
+            llama_path, use_fast=False, local_files_only=_local_only
+        )
         self.llama_tokenizer.add_special_tokens({'pad_token': '[PAD]'})
         self.llama_tokenizer.padding_side = "right"
 
@@ -122,11 +127,13 @@ class SALMONN(nn.Module):
                 torch_dtype=torch.float16,
                 load_in_8bit=True,
                 device_map={"": device_8bit},
+                local_files_only=_local_only,
             )
         else:
             self.llama_model = LlamaForCausalLM.from_pretrained(
                 llama_path,
                 torch_dtype=model_dtype,
+                local_files_only=_local_only,
             )
         logging.info(f'LLaMA dtype: {model_dtype}')
 
