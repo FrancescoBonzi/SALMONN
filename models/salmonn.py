@@ -285,7 +285,7 @@ class SALMONN(nn.Module):
 
         return self._encode_auditory_feature(speech_embeds, audio_embeds=audio_embeds)
 
-    def prompt_wrap(self, embeds, atts, prompt, multi_prompt=False):
+    def prompt_wrap(self, embeds, atts, prompt, multi_prompt=False, output_attentions=False):
         if prompt:
             if multi_prompt:
                 p_before = []
@@ -333,6 +333,9 @@ class SALMONN(nn.Module):
 
                 wrapped_embeds = torch.cat([p_before_embeds, embeds, p_after_embeds], dim=1)
                 wrapped_atts = torch.cat([p_before_tokens.attention_mask, atts, p_after_tokens.attention_mask], dim=1)
+
+            if output_attentions:
+                return wrapped_embeds, wrapped_atts, p_before_tokens.input_ids.shape[1]
             return wrapped_embeds, wrapped_atts
         else:
             return embeds, atts
@@ -368,7 +371,10 @@ class SALMONN(nn.Module):
 
         # wrap speech_embeds with prompts (includes question for reasoning tasks)
         if self.prompt_dict:
-            speech_embeds, speech_atts = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt)
+            if output_attentions:
+                speech_embeds, speech_atts, p_before_speech_len = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt, output_attentions=True)
+            else:
+                speech_embeds, speech_atts = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt)
 
         # prepare inputs for LLM (use answer for reasoning tasks, text for ASR)
         if "answer" in samples and any(samples["answer"]):
@@ -436,6 +442,7 @@ class SALMONN(nn.Module):
             out["attentions_meta"] = {
                 "to_regress_tokens": to_regress_tokens.input_ids,
                 "start_regress": atts_bos.shape[1] + speech_embeds.shape[1],
+                "start_speech": 1 + p_before_speech_len,
                 "speech_len": speech_embeds.shape[1],
                 "mask_4d": ~torch.tril(mask_4d.repeat(1, 1, mask_4d.shape[-1], 1)),
             }
@@ -767,6 +774,13 @@ class ConclusionFocusSALMONN(SALMONN):
             alpha = np.random.exponential(0.15, 1) + alpha_min.item()
             alpha = float(np.clip(alpha, alpha_min.item(), 1.0).item())
             loss = alpha * loss_conclusion + (1 - alpha) * loss_other_chapters
+
+        if verbose:
+            ntp_preds = logits.argmax(dim=-1)
+            mask = (targets != -100)
+            correct = (ntp_preds[mask] == targets[mask]).float().sum()
+            total = mask.sum().item()
+            return {"loss": loss, "correct": correct, "total": total}
 
         return {"loss": loss}
 
@@ -1693,7 +1707,10 @@ class MutorBERTConclusionSALMONN(MutorSALMONN):
 
         # wrap speech_embeds with prompts (includes question for reasoning tasks)
         if self.prompt_dict:
-            speech_embeds, speech_atts = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt)
+            if output_attentions:
+                speech_embeds, speech_atts, p_before_speech_len = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt, output_attentions=True)
+            else:
+                speech_embeds, speech_atts = self.prompt_wrap(speech_embeds, speech_atts, prompt, multi_prompt=self.multi_prompt)
 
         # prepare inputs for LLM (use answer for reasoning tasks, text for ASR)
         if "answer" in samples and any(samples["answer"]):
@@ -1834,6 +1851,7 @@ class MutorBERTConclusionSALMONN(MutorSALMONN):
             out["attentions_meta"] = {
                 "to_regress_tokens": to_regress_tokens.input_ids,
                 "start_regress": start_regress,
+                "start_speech": 1 + p_before_speech_len,
                 "speech_len": speech_embeds.shape[1],
                 "mask_4d": mask_4d.bool(),
             }
@@ -2532,6 +2550,8 @@ class MutorBERTTripletLossSALMONN(MutorSALMONN):
                 "loss_reg": loss_reg,
                 "ntp_correct": ntp_correct,
                 "ntp_total": ntp_total,
+                "correct": ntp_correct,
+                "total": ntp_total,
             }
 
         return {"loss": loss, "loss_ntp": loss_ntp, "loss_reg": loss_reg}
