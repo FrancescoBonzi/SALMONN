@@ -446,6 +446,7 @@ class MutorBERTConclusionQwen25Omni(Qwen25Omni):
         lora_rank: int = 8,
         lora_alpha: int = 32,
         lora_dropout: float = 0.1,
+        bert_conclusion_path: str = None,
     ):
         super().__init__(
             qwen25_omni_path=qwen25_omni_path,
@@ -461,9 +462,14 @@ class MutorBERTConclusionQwen25Omni(Qwen25Omni):
         self.alpha = alpha
         self.reg_token_id = self.tokenizer.convert_tokens_to_ids("<reg>")
 
-        _bert_model_name = "sentence-transformers/all-MiniLM-L6-v2"
-        self.conclusion_tokenizer = AutoTokenizer.from_pretrained(_bert_model_name)
-        self.conclusion_encoder = AutoModel.from_pretrained(_bert_model_name)
+        _bert_model_name = bert_conclusion_path or "sentence-transformers/all-MiniLM-L6-v2"
+        _local_files_only = bert_conclusion_path is not None
+        self.conclusion_tokenizer = AutoTokenizer.from_pretrained(
+            _bert_model_name, local_files_only=_local_files_only
+        )
+        self.conclusion_encoder = AutoModel.from_pretrained(
+            _bert_model_name, local_files_only=_local_files_only
+        )
         self.conclusion_encoder.eval()
         for param in self.conclusion_encoder.parameters():
             param.requires_grad = False
@@ -654,6 +660,7 @@ class MutorBERTConclusionQwen25Omni(Qwen25Omni):
             lora_rank=config.get("lora_rank", 8),
             lora_alpha=config.get("lora_alpha", 32),
             lora_dropout=config.get("lora_dropout", 0.1),
+            bert_conclusion_path=config.get("bert_conclusion_path") or None,
         )
 
         ckpt_path = config.get("ckpt", "")

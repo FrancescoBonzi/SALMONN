@@ -25,5 +25,9 @@ wget -O salmonn_v1.pth "https://huggingface.co/tsinghua-ee/SALMONN/resolve/main/
 echo "Downloading Qwen2.5-Omni 7B..."
 hf download Qwen/Qwen2.5-Omni-7B --local-dir Qwen2.5-Omni-7B
 
+# 6. all-MiniLM-L6-v2 (for qwen_mutor_bert_conclusion MuToR BERT conclusion encoder)
+echo "Downloading sentence-transformers/all-MiniLM-L6-v2..."
+hf download sentence-transformers/all-MiniLM-L6-v2 --local-dir all-MiniLM-L6-v2
+
 echo "Done!"
 

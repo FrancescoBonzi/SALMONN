@@ -9,6 +9,11 @@ model:
   # Qwen2.5-Omni model path (HuggingFace hub or local)
   qwen25_omni_path: "Qwen/Qwen2.5-Omni-7B"
 
+  # BERT conclusion encoder path (sentence-transformers/all-MiniLM-L6-v2).
+  # Set to local path when running on clusters where HuggingFace is blocked by proxy.
+  # Pre-download: huggingface-cli download sentence-transformers/all-MiniLM-L6-v2 --local-dir pretrained/all-MiniLM-L6-v2
+  bert_conclusion_path: ""
+
   # MuToR hyperparameters
   mutor_alpha: 1.0
 

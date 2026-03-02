@@ -52,6 +52,17 @@ else
     echo "Using HuggingFace path for Qwen2.5-Omni (will download if not cached)"
 fi
 
+# Copy BERT conclusion model if available (required when cluster proxy blocks HuggingFace)
+# Pre-download: huggingface-cli download sentence-transformers/all-MiniLM-L6-v2 --local-dir pretrained/all-MiniLM-L6-v2
+bert_path=""
+if [ -d "pretrained/all-MiniLM-L6-v2" ]; then
+    echo "Copying all-MiniLM-L6-v2 from pretrained/..."
+    cp -r "pretrained/all-MiniLM-L6-v2" "$SLURM_TMPDIR/pretrained/"
+    bert_path="$SLURM_TMPDIR/pretrained/all-MiniLM-L6-v2"
+else
+    echo "WARNING: pretrained/all-MiniLM-L6-v2 not found. HuggingFace download may fail if proxy blocks it."
+fi
+
 # Update annotation paths
 echo "Updating annotation paths..."
 sed -i "s|[^\"]*data/YouTube8M|$SLURM_TMPDIR/data/YouTube8M|g" "$SLURM_TMPDIR/data/YouTube8M/annotations/"*.json
@@ -63,19 +74,26 @@ module load StdEnv/2023 cuda/12.2
 module load httpproxy
 source .venv/bin/activate
 
+# Unset proxy for HuggingFace (cluster proxy often blocks huggingface.co with 403)
+unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy NO_PROXY no_proxy
+
+# Build training options
+train_opts=(
+    model.qwen25_omni_path="$qwen_path"
+    datasets.train_ann_path="$SLURM_TMPDIR/data/YouTube8M/annotations/train_youtube8m.json"
+    datasets.valid_ann_path="$SLURM_TMPDIR/data/YouTube8M/annotations/test_youtube8m.json"
+    datasets.test_ann_path="$SLURM_TMPDIR/data/YouTube8M/annotations/test_youtube8m.json"
+    datasets.whisper_path="$qwen_path"
+    run.seed="$seed"
+    run.output_dir="outputs/afthink_youtube8m/$model_type/$seed"
+    run.num_workers="$SLURM_CPUS_PER_TASK"
+)
+[ -n "$bert_path" ] && train_opts+=(model.bert_conclusion_path="$bert_path")
+
 # Run training
 echo "Starting training..."
-
 torchrun --nproc_per_node=4 train_qwen.py --cfg-path recipes/afthink/$model_type.yaml \
-    --options \
-    model.qwen25_omni_path="$qwen_path" \
-    datasets.train_ann_path="$SLURM_TMPDIR/data/YouTube8M/annotations/train_youtube8m.json" \
-    datasets.valid_ann_path="$SLURM_TMPDIR/data/YouTube8M/annotations/test_youtube8m.json" \
-    datasets.test_ann_path="$SLURM_TMPDIR/data/YouTube8M/annotations/test_youtube8m.json" \
-    datasets.whisper_path="$qwen_path" \
-    run.seed="$seed" \
-    run.output_dir="outputs/afthink_youtube8m/$model_type/$seed" \
-    run.num_workers="$SLURM_CPUS_PER_TASK"
+    --options "${train_opts[@]}"
 
 echo "Training finished at $(date)"
 
@@ -84,6 +102,16 @@ echo "Starting evaluation..."
 OUTPUT_DIR=$(ls -dt outputs/afthink_youtube8m/$model_type/$seed/* 2>/dev/null | head -n 1)
 BEST_CKPT="${OUTPUT_DIR}/checkpoint_best.pth"
 echo "Using checkpoint: $BEST_CKPT"
+
+# Build eval options (include bert_conclusion_path if using local BERT)
+eval_opts=(
+    model.qwen25_omni_path="$qwen_path"
+    datasets.test_ann_path="$SLURM_TMPDIR/data/MMAU/annotations/test_mmau.json"
+    datasets.whisper_path="$qwen_path"
+    run.seed="$seed"
+    run.num_workers="$SLURM_CPUS_PER_TASK"
+)
+[ -n "$bert_path" ] && eval_opts+=(model.bert_conclusion_path="$bert_path")
 
 echo "Evaluating MMAU..."
 python evaluate_qwen_mmau.py \
@@ -94,14 +122,19 @@ python evaluate_qwen_mmau.py \
     --device cuda:0 \
     --output-file "outputs/mmau/$eval_filename" \
     --prompt-type "$prompt_type" \
-    --options \
-    model.qwen25_omni_path="$qwen_path" \
-    datasets.test_ann_path="$SLURM_TMPDIR/data/MMAU/annotations/test_mmau.json" \
-    datasets.whisper_path="$qwen_path" \
-    run.seed="$seed" \
-    run.num_workers="$SLURM_CPUS_PER_TASK"
+    --options "${eval_opts[@]}"
 
 echo "MMAU evaluation finished at $(date)"
+
+# Update eval opts for MMAR
+eval_opts=(
+    model.qwen25_omni_path="$qwen_path"
+    datasets.test_ann_path="$SLURM_TMPDIR/data/MMAR/annotations/test_mmar.json"
+    datasets.whisper_path="$qwen_path"
+    run.seed="$seed"
+    run.num_workers="$SLURM_CPUS_PER_TASK"
+)
+[ -n "$bert_path" ] && eval_opts+=(model.bert_conclusion_path="$bert_path")
 
 echo "Evaluating MMAR..."
 python evaluate_qwen_mmar.py \
@@ -112,12 +145,7 @@ python evaluate_qwen_mmar.py \
     --device cuda:0 \
     --output-file "outputs/mmar/$eval_filename" \
     --prompt-type "$prompt_type" \
-    --options \
-    model.qwen25_omni_path="$qwen_path" \
-    datasets.test_ann_path="$SLURM_TMPDIR/data/MMAR/annotations/test_mmar.json" \
-    datasets.whisper_path="$qwen_path" \
-    run.seed="$seed" \
-    run.num_workers="$SLURM_CPUS_PER_TASK"
+    --options "${eval_opts[@]}"
 
 echo "MMAR evaluation finished at $(date)"
 echo "Job finished at $(date)"
