@@ -758,7 +758,7 @@ class ConclusionFocusSALMONN(SALMONN):
 
             alpha_min = conclusion_mask.float().sum() / conclusion_mask.numel()
             alpha = np.random.exponential(0.15, 1) + alpha_min.item()
-            alpha = np.clip(alpha, alpha_min.item(), 1.0)
+            alpha = float(np.clip(alpha, alpha_min.item(), 1.0).item())
             loss = alpha * loss_conclusion + (1 - alpha) * loss_other_chapters
 
         return {"loss": loss}
