@@ -619,7 +619,7 @@ class MutorBERTConclusionQwen25Omni(Qwen25Omni):
             vocab_size = logits.shape[-1]
             logits_for_loss = logits[:, start_regress - 1:, :].reshape(-1, vocab_size)
 
-            first_target = target_ids[:, 0:1].clone()
+            first_target = target_ids[:, 1:2].clone()
             first_target[first_target == self.reg_token_id] = -100
             full_targets = torch.cat([first_target, targets], dim=1).reshape(-1)
             loss_ntp = F.cross_entropy(
