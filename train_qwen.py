@@ -27,6 +27,7 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from tensorboardX import SummaryWriter
 
+from omegaconf import OmegaConf
 from config import Config
 from dist_utils import (
     get_rank,
@@ -40,7 +41,7 @@ from logger import MetricLogger, SmoothedValue
 from utils import get_dataloader, prepare_sample, now, setup_logger
 from optims import get_optimizer, LinearWarmupCosineLRScheduler
 from dataset import Qwen2AudioDataset
-from models.qwen import MutorBERTConclusionQwen25Omni
+from models import load_model
 
 
 def parse_args():
@@ -82,10 +83,24 @@ class Qwen25OmniTrainer:
         self.start_epoch = 0
         self.max_epoch = run_config.optims.max_epoch
 
-        # Build model
-        logging.info("Building MutorBERTConclusionQwen25Omni...")
-        self._model = MutorBERTConclusionQwen25Omni.from_config(model_config)
+        # Build model (supports qwen and qwen_mutor_bert_conclusion)
+        model_type = model_config.get("model_type", "qwen_mutor_bert_conclusion")
+        logging.info("Building %s...", model_type)
+        model_config_dict = OmegaConf.to_container(model_config, resolve=True)
+        self._model = load_model(model_config_dict)
         self._model.to(self.device)
+
+        # Sanity check: if LoRA is enabled, trainable params should be a small fraction
+        if model_config.get("lora", False):
+            trainable = sum(p.numel() for p in self._model.parameters() if p.requires_grad)
+            total = sum(p.numel() for p in self._model.parameters())
+            pct = 100.0 * trainable / total if total > 0 else 0
+            if pct > 50:
+                logging.warning(
+                    "LoRA enabled but %.1f%% of params are trainable - LoRA may not be applied correctly. "
+                    "Backward will be slow. Check target_modules match the model.",
+                    pct,
+                )
 
         if self.use_distributed:
             self.model = DDP(self._model, device_ids=[run_config.gpu], find_unused_parameters=True)

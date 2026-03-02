@@ -20,5 +20,10 @@ hf download lmsys/vicuna-13b-v1.1 --local-dir vicuna-13b-v1.1
 # 4. SALMONN pretrained checkpoint
 echo "Downloading SALMONN pretrained checkpoint..."
 wget -O salmonn_v1.pth "https://huggingface.co/tsinghua-ee/SALMONN/resolve/main/salmonn_v1.pth?download=true"
+
+# 5. Qwen2.5-Omni 7B (for qwen and qwen_mutor_bert_conclusion training)
+echo "Downloading Qwen2.5-Omni 7B..."
+hf download Qwen/Qwen2.5-Omni-7B --local-dir Qwen2.5-Omni-7B
+
 echo "Done!"
 

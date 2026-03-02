@@ -48,10 +48,13 @@ class Qwen25Omni(nn.Module):
         self.max_txt_len = max_txt_len
         self.lora = lora
 
+        # bfloat16 on GPU; float32 on CPU for compatibility (bfloat16 on CPU is slow)
+        model_dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float32
         self.thinker = Qwen2_5OmniThinkerForConditionalGeneration.from_pretrained(
             qwen25_omni_path,
-            torch_dtype=torch.bfloat16,
+            torch_dtype=model_dtype,
         )
+        logger.info("Qwen thinker dtype: %s", model_dtype)
         self.processor = Qwen2_5OmniProcessor.from_pretrained(qwen25_omni_path)
         self.tokenizer = self.processor.tokenizer
 
@@ -84,10 +87,20 @@ class Qwen25Omni(nn.Module):
                 bias="none",
             )
             self.thinker.model = get_peft_model(self.thinker.model, lora_cfg)
+            # lm_head is outside the PEFT wrapper; freeze it so only LoRA params are trainable
+            if hasattr(self.thinker, "lm_head") and self.thinker.lm_head is not None:
+                for param in self.thinker.lm_head.parameters():
+                    param.requires_grad = False
+                logger.info("Froze lm_head (LoRA mode)")
+            trainable = sum(p.numel() for p in self.parameters() if p.requires_grad)
+            total = sum(p.numel() for p in self.parameters())
             logger.info(
-                "Applied LoRA (r=%d, alpha=%d) to thinker.model",
+                "Applied LoRA (r=%d, alpha=%d) to thinker.model | trainable: %s / %s (%.2f%%)",
                 lora_rank,
                 lora_alpha,
+                f"{trainable:,}",
+                f"{total:,}",
+                100.0 * trainable / total if total > 0 else 0,
             )
 
     @property
@@ -117,9 +130,14 @@ class Qwen25Omni(nn.Module):
         audio_outputs = self.thinker.get_audio_features(
             input_features,
             feature_attention_mask=feature_attention_mask,
-            return_dict=True,
         )
-        return audio_outputs.last_hidden_state, audio_output_lengths
+        # transformers 5.x returns tensor directly; older versions return object with .last_hidden_state
+        audio_hidden = (
+            audio_outputs.last_hidden_state
+            if hasattr(audio_outputs, "last_hidden_state")
+            else audio_outputs
+        )
+        return audio_hidden, audio_output_lengths
 
     def forward(self, samples, verbose=False):
         """
@@ -212,11 +230,6 @@ class Qwen25Omni(nn.Module):
             mask_4d > 0.5, float(torch.finfo(mask_4d.dtype).min)
         )
 
-        causal_mask_mapping = {
-            "full_attention": mask_4d,
-            "sliding_attention": mask_4d,
-        }
-
         # 3D position IDs for TMRoPE: (3, B, total_len)
         prompt_position_ids = (
             torch.arange(prompt_len, device=device).unsqueeze(0).expand(batch_size, -1)
@@ -238,7 +251,7 @@ class Qwen25Omni(nn.Module):
         with self.maybe_autocast():
             text_outputs = self.thinker.model(
                 inputs_embeds=inputs_embeds,
-                attention_mask=causal_mask_mapping,
+                attention_mask=mask_4d,
                 position_ids=position_ids,
                 output_hidden_states=False,
                 use_cache=False,
@@ -566,11 +579,6 @@ class MutorBERTConclusionQwen25Omni(Qwen25Omni):
             mask_4d > 0.5, float(torch.finfo(mask_4d.dtype).min)
         )
 
-        causal_mask_mapping = {
-            "full_attention": mask_4d,
-            "sliding_attention": mask_4d,
-        }
-
         # 3D position IDs for TMRoPE: (3, B, total_len)
         prompt_position_ids = (
             torch.arange(prompt_len, device=device).unsqueeze(0).expand(batch_size, -1)
@@ -592,7 +600,7 @@ class MutorBERTConclusionQwen25Omni(Qwen25Omni):
         with self.maybe_autocast():
             text_outputs = self.thinker.model(
                 inputs_embeds=inputs_embeds,
-                attention_mask=causal_mask_mapping,
+                attention_mask=mask_4d,
                 position_ids=position_ids,
                 output_hidden_states=True,
                 use_cache=False,

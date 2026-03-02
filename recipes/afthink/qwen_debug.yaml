@@ -1,0 +1,70 @@
+# Qwen2.5-Omni Debug Config for SALMONN
+# Uses mock Qwen model for fast iteration and CPU-friendly debugging
+#
+# Usage:
+#   1. Create mock: python recipes/create_mock_qwen.py
+#   2. Train: python train_qwen.py --cfg-path recipes/afthink/qwen_debug.yaml
+
+model:
+  model_type: "qwen"
+
+  # Mock Qwen for CPU debugging (~few M params)
+  qwen25_omni_path: "pretrained/mock-qwen"
+
+  freeze_audio_tower: True
+  freeze_visual: True
+
+  # LoRA (efficient fine-tuning)
+  lora: True
+  lora_rank: 4
+  lora_alpha: 16
+  lora_dropout: 0.1
+
+  max_txt_len: 300
+
+  ckpt: ""
+
+datasets:
+  train_ann_path: "data/afthink_debug/train_afthink.json"
+  valid_ann_path: "data/afthink_debug/valid_afthink.json"
+  test_ann_path: "data/afthink_debug/test_afthink.json"
+
+  # Same as debug.yaml – Whisper feature extractor for audio preprocessing
+  whisper_path: "pretrained/whisper-tiny"
+
+run:
+  seed: 42
+  output_dir: "outputs/qwen_debug"
+  evaluate: False
+  save_only_best: True
+
+  log_freq: 1
+  epoch_based: False
+  iters_per_epoch: 100
+  accum_grad_iters: 1
+  batch_size_train: 2
+  batch_size_eval: 2
+  num_workers: 2
+
+  device: "cuda"
+  use_distributed: False
+  amp: True
+  world_size: 1
+  dist_url: "env://"
+
+  optims:
+    max_epoch: 1
+    warmup_steps: 10
+    warmup_start_lr: 1e-6
+    init_lr: 2e-5
+    min_lr: 1e-6
+    weight_decay: 0.05
+    beta2: 0.999
+
+generate:
+  max_new_tokens: 50
+  num_beams: 1
+  do_sample: False
+  temperature: 1.0
+  top_p: 0.9
+  repetition_penalty: 1.0
