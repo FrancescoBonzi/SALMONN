@@ -47,6 +47,7 @@ def extract_regress_sequence_attentions(
     full_attentions: torch.Tensor,
     mask_4d: torch.Tensor,
     start_regress: int,
+    start_speech: int,
     speech_len: int,
 ) -> torch.Tensor:
     """
@@ -58,17 +59,20 @@ def extract_regress_sequence_attentions(
     active_positions = 1.0 - mask_4d[:, 0, :, :].float()
     rollout_attention = _attention_rollout(full_attentions, mask_4d)
 
-    # Extract the attention for the speech tokens
-    to_regress_attention = rollout_attention[:, start_regress:, 1:1+speech_len]
+    # Extract the attention for the speech tokens (positions [start_speech, start_speech+speech_len))
+    to_regress_attention = rollout_attention[:, start_regress:, start_speech : start_speech + speech_len]
 
     # Compute excess over uniform
     actual = to_regress_attention.sum(dim=-1)
     num_valid_keys = active_positions[:, start_regress:, :].sum(dim=-1).clamp(min=1)
-    num_valid_speech = active_positions[:, start_regress:, 1:1+speech_len].sum(dim=-1)
+    num_valid_speech = active_positions[:, start_regress:, start_speech : start_speech + speech_len].sum(dim=-1)
     expected = num_valid_speech / num_valid_keys
-    excess = (actual - expected) / expected.clamp(min=1e-6)
-
-    return excess.mean()
+    # Only include positions where we have valid speech keys to avoid degenerate cases
+    valid_mask = num_valid_speech > 0
+    if valid_mask.any():
+        excess = (actual - expected) / expected.clamp(min=1e-6)
+        return excess[valid_mask].mean()
+    return torch.tensor(0.0, device=rollout_attention.device, dtype=rollout_attention.dtype)
 
 def extract_register_attentions(
     reg_token_id: int,
@@ -84,6 +88,7 @@ def extract_register_attentions(
     is the attention to speech under uniform distribution over valid keys.
     Value of 0 = uniform, >0 = more attention to speech than chance.
     """
+    start_speech = start_regress - speech_len
     batch_size = to_regress_tokens.shape[0]
     active_positions = 1.0 - mask_4d[:, 0, :, :].float()
     rollout_attention = _attention_rollout(full_attentions, mask_4d)
@@ -94,13 +99,15 @@ def extract_register_attentions(
         reg_ids = start_regress + torch.where(to_regress_tokens[i] == reg_token_id)[0]
         if len(reg_ids) == 0:
             continue
-        ra = rollout_attention[i, reg_ids, 1:1+speech_len]
+        ra = rollout_attention[i, reg_ids, start_speech : start_speech + speech_len]
         actual = ra.sum(dim=-1)
         num_valid_keys = active_positions[i, reg_ids, :].sum(dim=-1).clamp(min=1)
-        num_valid_speech = active_positions[i, reg_ids, 1:1+speech_len].sum(dim=-1)
+        num_valid_speech = active_positions[i, reg_ids, start_speech : start_speech + speech_len].sum(dim=-1)
         expected = num_valid_speech / num_valid_keys
-        excess = (actual - expected) / expected.clamp(min=1e-6)
-        register_excess.append(excess.mean())
+        valid_mask = num_valid_speech > 0
+        if valid_mask.any():
+            excess = (actual - expected) / expected.clamp(min=1e-6)
+            register_excess.append(excess[valid_mask].mean())
     if len(register_excess) == 0:
         return torch.tensor(0.0, device=rollout_attention.device, dtype=rollout_attention.dtype)
     return torch.stack(register_excess, dim=0).mean()
@@ -147,6 +154,11 @@ def main():
     )
 
     num_batches = 0
+    regress_sequence_sum = 0.0
+    register_sum = 0.0
+    regress_sequence_count = 0
+    register_count = 0
+
     for batch in tqdm(loader, desc="Extracting attention"):
         for k, v in batch.items():
             if isinstance(v, torch.Tensor):
@@ -160,21 +172,30 @@ def main():
             continue
 
         meta = output["attentions_meta"]
-        regress_sequence_sum_attentions = extract_regress_sequence_attentions(
-            output["attentions"],
-            meta["mask_4d"],
-            meta["start_regress"],
-            meta["speech_len"]
-        )
+        batch_size = meta["mask_4d"].shape[0]
 
-        register_sum_attentions = extract_register_attentions(
-            model.llama_tokenizer.convert_tokens_to_ids("<reg>"),
+        regress_val = extract_regress_sequence_attentions(
             output["attentions"],
-            meta["to_regress_tokens"],
             meta["mask_4d"],
             meta["start_regress"],
+            meta["start_speech"],
             meta["speech_len"]
         )
+        regress_sequence_sum += float(regress_val) * batch_size
+        regress_sequence_count += batch_size
+
+        to_regress_tokens = meta.get("to_regress_tokens")
+        if to_regress_tokens is not None:
+            register_val = extract_register_attentions(
+                model.llama_tokenizer.convert_tokens_to_ids("<reg>"),
+                output["attentions"],
+                to_regress_tokens,
+                meta["mask_4d"],
+                meta["start_regress"],
+                meta["speech_len"]
+            )
+            register_sum += float(register_val) * batch_size
+            register_count += batch_size
 
         num_batches += 1
 
@@ -182,13 +203,17 @@ def main():
         print("No batches with attentions. Exiting.")
         return
 
+    # Average over all batches (weighted by batch size)
+    regress_sequence_mean = regress_sequence_sum / regress_sequence_count if regress_sequence_count > 0 else 0.0
+    register_mean = register_sum / register_count if register_count > 0 else 0.0
+
     # Save summarized metrics as JSON
     metrics = {
         "regress_sequence_attention": {
-            "excess_over_uniform": float(regress_sequence_sum_attentions),
+            "excess_over_uniform": regress_sequence_mean,
         },
         "register_attention": {
-            "excess_over_uniform": float(register_sum_attentions),
+            "excess_over_uniform": register_mean,
         },
     }
     with open(output_path, "w") as f:
