@@ -768,6 +768,13 @@ class ConclusionFocusSALMONN(SALMONN):
             alpha = float(np.clip(alpha, alpha_min.item(), 1.0).item())
             loss = alpha * loss_conclusion + (1 - alpha) * loss_other_chapters
 
+        if verbose:
+            ntp_preds = logits.argmax(dim=-1)
+            mask = (targets != -100)
+            correct = (ntp_preds[mask] == targets[mask]).float().sum()
+            total = mask.sum().item()
+            return {"loss": loss, "correct": correct, "total": total}
+
         return {"loss": loss}
 
 
@@ -2536,6 +2543,8 @@ class MutorBERTTripletLossSALMONN(MutorSALMONN):
                 "loss_reg": loss_reg,
                 "ntp_correct": ntp_correct,
                 "ntp_total": ntp_total,
+                "correct": ntp_correct,
+                "total": ntp_total,
             }
 
         return {"loss": loss, "loss_ntp": loss_ntp, "loss_reg": loss_reg}
