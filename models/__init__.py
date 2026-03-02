@@ -39,9 +39,9 @@ def load_model(config):
         return ChapterAttentionSALMONN.from_config(config)
     elif model_type == "mutor_bert_triplet_loss":
         return MutorBERTTripletLossSALMONN.from_config(config)
-    elif model_type == "qwen25_omni":
+    elif model_type == "qwen":
         return Qwen25Omni.from_config(config)
-    elif model_type == "qwen25_omni_mutor_bert_conclusion":
+    elif model_type == "qwen_mutor_bert_conclusion":
         return MutorBERTConclusionQwen25Omni.from_config(config)
     else:
         raise ValueError(f"Invalid model type: {model_type}")

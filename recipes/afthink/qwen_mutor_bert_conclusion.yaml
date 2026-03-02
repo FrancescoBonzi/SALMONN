@@ -1,10 +1,10 @@
 # MuToR BERT Conclusion Training Config for Qwen2.5-Omni
 #
 # Usage:
-#   python train_qwen2audio.py --cfg-path recipes/qwen2audio/mutor_bert_conclusion.yaml
+#   python train_qwen.py --cfg-path recipes/afthink/qwen_mutor_bert_conclusion.yaml
 
 model:
-  model_type: "qwen25_omni_mutor_bert_conclusion"
+  model_type: "qwen_mutor_bert_conclusion"
 
   # Qwen2.5-Omni model path (HuggingFace hub or local)
   qwen25_omni_path: "Qwen/Qwen2.5-Omni-7B"

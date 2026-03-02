@@ -1,7 +1,7 @@
 # MMAR zero-shot evaluation config for Qwen2.5-Omni
 
 model:
-  model_type: "qwen25_omni"
+  model_type: "qwen"
   qwen25_omni_path: "Qwen/Qwen2.5-Omni-7B"
 
   # Unused by Qwen but kept for compatibility with the eval scripts
@@ -13,7 +13,7 @@ datasets:
 
 run:
   seed: 42
-  output_dir: "outputs/mmar/qwen25_omni_zeroshot"
+  output_dir: "outputs/mmar/qwen_zeroshot"
   device: "cuda"
 
 generate:

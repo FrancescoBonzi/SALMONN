@@ -393,7 +393,7 @@ class Qwen25Omni(nn.Module):
             qwen25_omni_path=config.get(
                 "qwen25_omni_path", "Qwen/Qwen2.5-Omni-7B"
             ),
-            max_txt_len=config.get("max_txt_len", 400),
+            max_txt_len=config.get("max_txt_len", 300),
             freeze_audio_tower=config.get("freeze_audio_tower", True),
             freeze_visual=config.get("freeze_visual", True),
             lora=config.get("lora", False),
