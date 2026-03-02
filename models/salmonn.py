@@ -733,18 +733,17 @@ class ConclusionFocusSALMONN(SALMONN):
 
         start_regress = bos_embeds.shape[1] + speech_embeds.shape[1]
 
-        # Build the conclusion mask
+        # Build the conclusion mask (shape [B, L] to align with logits)
         start_conclusion_mask = to_regress_tokens.input_ids == self.llama_tokenizer.convert_tokens_to_ids("<CONCLUSION>")
         end_conclusion_mask = to_regress_tokens.input_ids == self.llama_tokenizer.convert_tokens_to_ids("</CONCLUSION>")
-        conclusion_mask = (torch.cumsum(start_conclusion_mask, dim=1) - torch.cumsum(end_conclusion_mask, dim=1))
-        conclusion_mask = torch.cat([torch.zeros((batch_size, 1), device=device, dtype=torch.bool), conclusion_mask], dim=1).bool()
+        end_conclusion_mask = torch.cat([torch.zeros((batch_size, 1), device=device, dtype=torch.bool), end_conclusion_mask], dim=1)[:, :-1]
+        conclusion_mask = (torch.cumsum(start_conclusion_mask, dim=1) - torch.cumsum(end_conclusion_mask, dim=1)).bool()
 
         to_regress_embeds = self.llama_model.model.embed_tokens(to_regress_tokens.input_ids) if not self.lora else self.llama_model.model.model.embed_tokens(to_regress_tokens.input_ids)
+        # Targets: logits[i] predicts regress[i], so targets = to_regress_tokens (no roll, no prepend)
         targets = to_regress_tokens.input_ids.masked_fill(
             to_regress_tokens.input_ids == self.llama_tokenizer.pad_token_id, -100
-        ).roll(-1, dims=1)
-        targets[:, -1] = -100
-        targets = torch.cat([529 * torch.ones((batch_size, 1), device=device, dtype=to_regress_tokens.input_ids.dtype), targets], dim=1)
+        )
 
         inputs_embeds = torch.cat([bos_embeds, speech_embeds, to_regress_embeds], dim=1)
         attention_mask = torch.cat([atts_bos, speech_atts, to_regress_tokens.attention_mask], dim=1)
@@ -758,7 +757,7 @@ class ConclusionFocusSALMONN(SALMONN):
                 labels=None,
                 use_cache=False,
             )
-            logits = outputs.logits[:, start_regress-1:, :]
+            logits = outputs.logits[:, start_regress-1:-1, :]
 
             loss_conclusion = F.cross_entropy(logits[conclusion_mask, :], targets[conclusion_mask], ignore_index=-100)
             loss_other_chapters = F.cross_entropy(logits[~conclusion_mask, :], targets[~conclusion_mask], ignore_index=-100)
