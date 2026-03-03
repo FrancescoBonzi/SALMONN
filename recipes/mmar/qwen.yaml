@@ -2,14 +2,14 @@
 
 model:
   model_type: "qwen"
-  qwen25_omni_path: "Qwen/Qwen2.5-Omni-7B"
+  qwen25_omni_path: "pretrained/Qwen2.5-Omni-7B"
 
   # Unused by Qwen but kept for compatibility with the eval scripts
   prompt_template: "{}"
 
 datasets:
   test_ann_path: "data/MMAR/annotations/test_mmar.json"
-  whisper_path: "Qwen/Qwen2.5-Omni-7B"
+  whisper_path: "pretrained/Qwen2.5-Omni-7B"
 
 run:
   seed: 42
