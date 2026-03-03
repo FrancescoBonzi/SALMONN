@@ -37,10 +37,10 @@ wait $COPY_YOUTUBE8M_DATA_PID $COPY_MMAR_DATA_PID $COPY_MMAU_DATA_PID
 echo "Data copy complete!"
 
 # Extract YouTube8M audio archive if present
-YT8M_ARCHIVE="$SLURM_TMPDIR/data/YouTube8M/youtube8m_audio_files.tar.gz"
-[ -f "$YT8M_ARCHIVE" ] && tar -xzf "$YT8M_ARCHIVE" -C "$SLURM_TMPDIR/data/YouTube8M/" && rm "$YT8M_ARCHIVE"
+# YT8M_ARCHIVE="$SLURM_TMPDIR/data/YouTube8M/youtube8m_audio_files.tar.gz"
+# [ -f "$YT8M_ARCHIVE" ] && tar -xzf "$YT8M_ARCHIVE" -C "$SLURM_TMPDIR/data/YouTube8M/" && rm "$YT8M_ARCHIVE"
 
-echo "Extracted youtube8m_audio_files.tar.gz"
+# echo "Extracted youtube8m_audio_files.tar.gz"
 
 # Copy Qwen2.5-Omni if available locally (optional - otherwise downloads from HuggingFace)
 mkdir -p "$SLURM_TMPDIR/pretrained"
@@ -90,7 +90,7 @@ python evaluate_qwen_mmau.py \
     --cfg-path recipes/afthink/$model_type.yaml \
     --ckpt "$BEST_CKPT" \
     --batch-size 4 \
-    --num-workers "$SLURM_CPUS_PER_TASK" \
+    --num-workers 8 \
     --device cuda:0 \
     --output-file "outputs/mmau/$eval_filename" \
     --prompt-type "$prompt_type" \
@@ -99,7 +99,7 @@ python evaluate_qwen_mmau.py \
     datasets.test_ann_path="$SLURM_TMPDIR/data/MMAU/annotations/test_mmau.json" \
     datasets.whisper_path="$qwen_path" \
     run.seed="$seed" \
-    run.num_workers="$SLURM_CPUS_PER_TASK"
+    run.num_workers=8
 
 echo "MMAU evaluation finished at $(date)"
 
@@ -108,7 +108,7 @@ python evaluate_qwen_mmar.py \
     --cfg-path recipes/afthink/$model_type.yaml \
     --ckpt "$BEST_CKPT" \
     --batch-size 4 \
-    --num-workers "$SLURM_CPUS_PER_TASK" \
+    --num-workers 8 \
     --device cuda:0 \
     --output-file "outputs/mmar/$eval_filename" \
     --prompt-type "$prompt_type" \
@@ -117,7 +117,7 @@ python evaluate_qwen_mmar.py \
     datasets.test_ann_path="$SLURM_TMPDIR/data/MMAR/annotations/test_mmar.json" \
     datasets.whisper_path="$qwen_path" \
     run.seed="$seed" \
-    run.num_workers="$SLURM_CPUS_PER_TASK"
+    run.num_workers=8
 
 echo "MMAR evaluation finished at $(date)"
 echo "Job finished at $(date)"
