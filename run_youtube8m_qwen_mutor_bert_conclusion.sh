@@ -114,6 +114,7 @@ python evaluate_qwen_mmau.py \
     --prompt-type "$prompt_type" \
     --options \
     model.qwen25_omni_path="$qwen_path" \
+    model.bert_conclusion_path="$bert_path" \
     datasets.test_ann_path="$SLURM_TMPDIR/data/MMAU/annotations/test_mmau.json" \
     datasets.whisper_path="$qwen_path" \
     run.seed="$seed" \
@@ -132,6 +133,7 @@ python evaluate_qwen_mmar.py \
     --prompt-type "$prompt_type" \
     --options \
     model.qwen25_omni_path="$qwen_path" \
+    model.bert_conclusion_path="$bert_path" \
     datasets.test_ann_path="$SLURM_TMPDIR/data/MMAR/annotations/test_mmar.json" \
     datasets.whisper_path="$qwen_path" \
     run.seed="$seed" \
