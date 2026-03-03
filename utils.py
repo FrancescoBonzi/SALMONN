@@ -49,10 +49,11 @@ def get_dataloader(dataset, config, is_train=True, use_distributed=True):
     else:
         sampler = None
 
+    num_workers = config.num_workers if is_train else min(2, config.num_workers)
     loader = DataLoader(
         dataset,
         batch_size=config.batch_size_train if is_train else config.batch_size_eval,
-        num_workers=config.num_workers,
+        num_workers=num_workers,
         pin_memory=True,
         sampler=sampler,
         shuffle=sampler is None and is_train,

@@ -75,7 +75,7 @@ torchrun --nproc_per_node=4 train_qwen.py --cfg-path recipes/afthink/$model_type
     datasets.whisper_path="$qwen_path" \
     run.seed="$seed" \
     run.output_dir="outputs/afthink_youtube8m/$model_type/$seed" \
-    run.num_workers="$SLURM_CPUS_PER_TASK"
+    run.num_workers=8
 
 echo "Training finished at $(date)"
 

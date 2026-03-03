@@ -13,6 +13,7 @@ import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import argparse
+import gc
 import json
 import time
 import datetime
@@ -218,7 +219,7 @@ class Qwen25OmniTrainer:
         }
 
     @torch.no_grad()
-    def valid_epoch(self, epoch, split="valid", decode=False, save_json=False):
+    def valid_epoch(self, epoch, split="valid"):
         model = self.unwrap_model()
         model.eval()
 
@@ -226,9 +227,19 @@ class Qwen25OmniTrainer:
         assert dataloader is not None, f"{split}_loader does not exist."
 
         metric_logger = MetricLogger(delimiter="  ")
+        metric_logger.add_meter("loss", SmoothedValue(window_size=1, fmt="{value:.4f}"))
+        metric_logger.add_meter("loss_ntp", SmoothedValue(window_size=1, fmt="{value:.4f}"))
+        metric_logger.add_meter("loss_reg", SmoothedValue(window_size=1, fmt="{value:.4f}"))
+        metric_logger.add_meter("acc", SmoothedValue(window_size=1, fmt="{value:.4f}"))
         header = f"Eval: data epoch: [{epoch}]"
 
-        results = []
+        agg = {
+            "loss": torch.tensor(0.0).cuda(),
+            "n_sample": torch.tensor(0.0).cuda(),
+            "correct": torch.tensor(0.0).cuda(),
+            "n_token": torch.tensor(0.0).cuda(),
+        }
+
         for samples in metric_logger.log_every(dataloader, self.log_freq, header=header):
             samples = prepare_sample(samples, cuda_enabled=(self.device.type == "cuda"))
 
@@ -241,43 +252,28 @@ class Qwen25OmniTrainer:
             ntp_correct = forward_result.get("ntp_correct", 0)
             ntp_total = forward_result.get("ntp_total", 1)
 
-            res = {
-                "id": samples["id"],
-                "ground_truth": samples.get("text", samples.get("answer", "")),
-                "loss": loss.item() if hasattr(loss, "item") else loss,
-                "loss_ntp": loss_ntp.item() if hasattr(loss_ntp, "item") else loss_ntp,
-                "loss_reg": loss_reg.item() if hasattr(loss_reg, "item") else loss_reg,
-                "acc": (ntp_correct / ntp_total).item() if hasattr(ntp_correct, "item") and ntp_total > 0 else 0,
-                "total": ntp_total,
-            }
+            n = len(samples["id"])
+            loss_val = loss.item() if hasattr(loss, "item") else loss
+            acc_val = (ntp_correct / ntp_total).item() if hasattr(ntp_correct, "item") and ntp_total > 0 else 0
+            total_val = ntp_total.item() if hasattr(ntp_total, "item") else ntp_total
 
-            if decode:
-                text = model.generate(samples, self.config.config.generate)
-                res["text"] = text
+            agg["loss"] += loss_val * n
+            agg["n_sample"] += n
+            agg["correct"] += acc_val * total_val
+            agg["n_token"] += total_val
 
-            results.append(res)
+            metric_logger.update(
+                loss=loss_val,
+                loss_ntp=loss_ntp.item() if hasattr(loss_ntp, "item") else loss_ntp,
+                loss_reg=loss_reg.item() if hasattr(loss_reg, "item") else loss_reg,
+                acc=acc_val,
+            )
+
+        metric_logger.synchronize_between_processes()
+        logging.info("Averaged eval stats: %s", metric_logger.global_avg())
 
         if is_dist_avail_and_initialized():
             dist.barrier()
-
-        if save_json:
-            self._save_result(results, self.output_dir, f"eval_{split}_epoch_{epoch}")
-
-        # Aggregate
-        agg = {
-            "loss": torch.tensor(0.0).cuda(),
-            "n_sample": torch.tensor(0.0).cuda(),
-            "correct": torch.tensor(0.0).cuda(),
-            "n_token": torch.tensor(0.0).cuda(),
-        }
-        for item in results:
-            n = len(item["id"])
-            agg["loss"] += item["loss"] * n
-            agg["n_sample"] += n
-            agg["correct"] += item["acc"] * item["total"]
-            agg["n_token"] += item["total"]
-
-        if is_dist_avail_and_initialized():
             for v in agg.values():
                 dist.all_reduce(v)
 
@@ -301,7 +297,9 @@ class Qwen25OmniTrainer:
             self._log_stats(train_stats, split_name="train")
 
             logging.info("Validating Phase")
-            valid_log = self.valid_epoch(cur_epoch, "valid", decode=False, save_json=False)
+            torch.cuda.empty_cache()
+            gc.collect()
+            valid_log = self.valid_epoch(cur_epoch, "valid")
             if valid_log is not None and is_main_process():
                 agg_metrics = valid_log["agg_metrics"]
                 if agg_metrics > best_agg_metric:
@@ -319,7 +317,7 @@ class Qwen25OmniTrainer:
                 dist.barrier()
 
         if self.evaluate_only:
-            self.valid_epoch("best", "test", decode=True, save_json=True)
+            self.valid_epoch("best", "test")
 
         total_time = time.time() - start_time
         logging.info("Training time %s", str(datetime.timedelta(seconds=int(total_time))))
