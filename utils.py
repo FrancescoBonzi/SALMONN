@@ -188,6 +188,29 @@ def pretrained_prompt_template(batch, metadata, cfg):
     return prompts
 
 
+def pretrained_reasoning_prompt_template(batch, metadata, cfg):
+    # Create prompts for batch
+    prompts = []
+    for i in range(len(batch["id"])):
+        id = batch["id"][i]
+        question = metadata[id]["question"]
+        if not question.endswith("?") and not question.endswith("."):
+            if question.startswith(("Which", "What", "Who", "When", "Where", "Why", "How", "Are", "Is")):
+                question += "?"
+            else:
+                question += "."
+        choices = "\n".join([
+            f"{choice}" 
+            for letter, choice in zip(
+                string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
+            )
+        ])
+        prompt = f"<Speech><SpeechHere></Speech> {question} Select one option from the provided choices.\n{choices}.\nShow your reasoning process before providing the answer."
+        prompts.append(cfg.config.model.prompt_template.format(prompt))
+
+    return prompts
+
+
 def afthink_prompt_template(batch, metadata, cfg):
     # Create prompts for batch
     prompts = []
@@ -237,6 +260,8 @@ def afthink_no_reasoning_prompt_template(batch, metadata, cfg):
 def get_prompts(batch, metadata, cfg, prompt_type="official"):
     if prompt_type == "official":
         return pretrained_prompt_template(batch, metadata, cfg)
+    elif prompt_type == "official_reasoning":
+        return pretrained_reasoning_prompt_template(batch, metadata, cfg)
     elif prompt_type == "afthink":
         return afthink_prompt_template(batch, metadata, cfg)
     elif prompt_type == "afthink_no_reasoning":
