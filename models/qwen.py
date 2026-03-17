@@ -166,6 +166,8 @@ class Qwen25Omni(nn.Module):
             raw_texts = samples["answer"]
         else:
             raw_texts = samples["text"]
+        eos = self.tokenizer.eos_token or ""
+        target_texts = [t + eos for t in raw_texts]
 
         batch_size = input_features.shape[0]
         questions = samples.get("question", [""] * batch_size)
@@ -187,7 +189,7 @@ class Qwen25Omni(nn.Module):
         ).to(device)
 
         target_tokens = self.tokenizer(
-            raw_texts,
+            target_texts,
             return_tensors="pt",
             padding="longest",
             truncation=True,
@@ -383,6 +385,19 @@ class Qwen25Omni(nn.Module):
             padding=True,
         ).to(device)
 
+        eos_token_id = (
+            self.thinker.generation_config.eos_token_id
+            if self.thinker.generation_config.eos_token_id is not None
+            else self.tokenizer.eos_token_id
+        )
+        pad_token_id = (
+            self.thinker.generation_config.pad_token_id
+            if self.thinker.generation_config.pad_token_id is not None
+            else self.tokenizer.pad_token_id
+        )
+        if pad_token_id is None:
+            pad_token_id = self.tokenizer.eos_token_id
+
         generate_ids = self.thinker.generate(
             input_ids=inputs.input_ids,
             input_features=input_features,
@@ -394,6 +409,8 @@ class Qwen25Omni(nn.Module):
             temperature=generate_cfg.get("temperature", 1.0),
             top_p=generate_cfg.get("top_p", 0.9),
             repetition_penalty=generate_cfg.get("repetition_penalty", 1.0),
+            eos_token_id=eos_token_id,
+            pad_token_id=pad_token_id,
         )
         generate_ids = generate_ids[:, inputs.input_ids.size(1):]
         return self.tokenizer.batch_decode(
@@ -495,6 +512,7 @@ class MutorBERTConclusionQwen25Omni(Qwen25Omni):
             raw_texts = samples["answer"]
         else:
             raw_texts = samples["text"]
+        eos = self.tokenizer.eos_token or ""
 
         all_conclusion_texts = []
         texts_with_reg = []
@@ -502,7 +520,7 @@ class MutorBERTConclusionQwen25Omni(Qwen25Omni):
             match = re.search(r"<CONCLUSION>(.*?)</CONCLUSION>", t, re.DOTALL)
             conclusion_text = match.group(1).strip()
             all_conclusion_texts.append(conclusion_text)
-            texts_with_reg.append("<reg>" + t)
+            texts_with_reg.append("<reg>" + t + eos)
 
         encoded = self.conclusion_tokenizer(
             all_conclusion_texts,
