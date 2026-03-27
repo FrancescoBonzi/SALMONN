@@ -1,14 +1,16 @@
 import argparse
 import json
+import os
 import re
-import string
+import sys
+from io import StringIO
 from tqdm import tqdm
 
 import torch
 from torch.utils.data import DataLoader
 
 from config import Config
-from models.salmonn import SALMONN, MutorSALMONN
+from models import load_model
 from dataset import SALMONNDataset
 from utils import get_prompts
 
@@ -164,14 +166,10 @@ def main():
     # Set checkpoint path in config so from_config loads it automatically
     cfg.config.model.ckpt = args.ckpt
     
-    # Use appropriate model class based on model_type
+    # Use appropriate model class based on model_type (salmonn, mutor, mutor_bert_summary, etc.)
     model_type = cfg.config.model.get("model_type", "salmonn")
-    if model_type == "mutor":
-        print("Loading MutorSALMONN model...")
-        model = MutorSALMONN.from_config(cfg.config.model)
-    else:
-        print("Loading SALMONN model...")
-        model = SALMONN.from_config(cfg.config.model)
+    print(f"Loading {model_type} model...")
+    model = load_model(cfg.config.model)
     model.to(args.device)
     model.eval()
     
@@ -245,13 +243,26 @@ def main():
                 torch.cuda.empty_cache()
 
     # Save results
-    with open(args.output_file, "w") as f:
+    os.makedirs(os.path.dirname(args.output_file), exist_ok=True)
+    answers_path = args.output_file.replace(".json", "_answers.json")
+    with open(answers_path, "w") as f:
         json.dump(results, f, indent=2)
-    print(f"Results saved to {args.output_file}")
+    print(f"Results saved to {answers_path}")
 
-    # Compute metrics
+    # Compute metrics (capture print output and write to file)
+    old_stdout = sys.stdout
+    sys.stdout = StringIO()
     corr, total = official_mmar_evaluation(results)
+    metrics_output = sys.stdout.getvalue()
+    sys.stdout = old_stdout
+    print(metrics_output)
     print(f"Official MMAR Accuracy: {(corr/total) * 100:.2f}% over {total} samples")
+
+    # Write metrics to .txt file in same directory as output_file
+    metrics_path = args.output_file.replace(".json", "_metrics.txt")
+    with open(metrics_path, "w") as f:
+        f.write(metrics_output)
+    print(f"Metrics saved to {metrics_path}")
 
 
 if __name__ == "__main__":

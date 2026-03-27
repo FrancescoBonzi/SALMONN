@@ -23,5 +23,7 @@
     "translation_en2de": "<Speech><SpeechHere></Speech> Listen to the speech and translate it into German.",
     "speech_audio_coreasoning": "<Speech><SpeechHere></Speech> Use your strong reasoning skills to answer the speaker's question in detail based on the background sound.",
     "keywords": "<Speech><SpeechHere></Speech> Give me only three keywords of the text.",
-    "speaker_diarization_asr": "<Speech><SpeechHere></Speech> Please recognize each speaker and transcribe their speech content."
+    "speaker_diarization_asr": "<Speech><SpeechHere></Speech> Please recognize each speaker and transcribe their speech content.",
+    "afthink_reasoning": "<Speech><SpeechHere></Speech> Output the answer with <SUMMARY>, <CAPTION>, <REASONING>, and <CONCLUSION> tags.",
+    "afthink_no_reasoning": "<Speech><SpeechHere></Speech> Answer with the correct option."
 }

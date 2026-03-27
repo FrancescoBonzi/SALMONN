@@ -12,13 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .salmonn import SALMONN, MutorSALMONN
+from .salmonn import *
 
 def load_model(config):
     model_type = config.get("model_type", "salmonn")
     if model_type == "salmonn":
         return SALMONN.from_config(config)
+    elif model_type == "cot_salmonn":
+        return CoTSALMONN.from_config(config)
+    elif model_type == "conclusion_focus_salmonn":
+        return ConclusionFocusSALMONN.from_config(config)
+    elif model_type == "reverse_salmonn":
+        return ReverseSALMONN.from_config(config)
     elif model_type == "mutor":
         return MutorSALMONN.from_config(config)
+    elif model_type == "mutor_bert_summary":
+        return MutorBERTSummarySALMONN.from_config(config)
+    elif model_type == "mutor_bert_conclusion":
+        return MutorBERTConclusionSALMONN.from_config(config)
+    elif model_type == "mutor_bert_multi_conclusion":
+        return MutorBERTMultiConclusionSALMONN.from_config(config)
+    elif model_type == "caption_attention_salmonn":
+        return CaptionAttentionSALMONN.from_config(config)
+    elif model_type == "chapter_attention_salmonn":
+        return ChapterAttentionSALMONN.from_config(config)
+    elif model_type == "mutor_bert_triplet_loss":
+        return MutorBERTTripletLossSALMONN.from_config(config)
     else:
         raise ValueError(f"Invalid model type: {model_type}")

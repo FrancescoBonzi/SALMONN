@@ -49,10 +49,11 @@ def get_dataloader(dataset, config, is_train=True, use_distributed=True):
     else:
         sampler = None
 
+    num_workers = config.num_workers if is_train else min(2, config.num_workers)
     loader = DataLoader(
         dataset,
         batch_size=config.batch_size_train if is_train else config.batch_size_eval,
-        num_workers=config.num_workers,
+        num_workers=num_workers,
         pin_memory=True,
         sampler=sampler,
         shuffle=sampler is None and is_train,
@@ -187,6 +188,29 @@ def pretrained_prompt_template(batch, metadata, cfg):
     return prompts
 
 
+def pretrained_reasoning_prompt_template(batch, metadata, cfg):
+    # Create prompts for batch
+    prompts = []
+    for i in range(len(batch["id"])):
+        id = batch["id"][i]
+        question = metadata[id]["question"]
+        if not question.endswith("?") and not question.endswith("."):
+            if question.startswith(("Which", "What", "Who", "When", "Where", "Why", "How", "Are", "Is")):
+                question += "?"
+            else:
+                question += "."
+        choices = "\n".join([
+            f"{choice}" 
+            for letter, choice in zip(
+                string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
+            )
+        ])
+        prompt = f"<Speech><SpeechHere></Speech> {question} Select one option from the provided choices.\n{choices}.\nShow your reasoning process before providing the answer."
+        prompts.append(cfg.config.model.prompt_template.format(prompt))
+
+    return prompts
+
+
 def afthink_prompt_template(batch, metadata, cfg):
     # Create prompts for batch
     prompts = []
@@ -210,10 +234,37 @@ def afthink_prompt_template(batch, metadata, cfg):
     return prompts
 
 
+def afthink_no_reasoning_prompt_template(batch, metadata, cfg):
+    # Create prompts for batch
+    prompts = []
+    for i in range(len(batch["id"])):
+        id = batch["id"][i]
+        question = metadata[id]["question"]
+        if not question.endswith("?") and not question.endswith("."):
+            if question.startswith(("Which", "What", "Who", "When", "Where", "Why", "How", "Are", "Is")):
+                question += "?"
+            else:
+                question += "."
+        choices = "\n".join([
+            f"({letter}) {choice}" 
+            for letter, choice in zip(
+                string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
+            )
+        ])
+        prompt = f"{question} Choose the correct option from the following options:\n{choices}. USER: <Speech><SpeechHere></Speech> Answer with the correct option.\nASSISTANT:"
+        prompts.append(prompt)
+    
+    return prompts
+
+
 def get_prompts(batch, metadata, cfg, prompt_type="official"):
     if prompt_type == "official":
         return pretrained_prompt_template(batch, metadata, cfg)
+    elif prompt_type == "official_reasoning":
+        return pretrained_reasoning_prompt_template(batch, metadata, cfg)
     elif prompt_type == "afthink":
         return afthink_prompt_template(batch, metadata, cfg)
+    elif prompt_type == "afthink_no_reasoning":
+        return afthink_no_reasoning_prompt_template(batch, metadata, cfg)
     else:
         raise ValueError(f"Invalid prompt type: {prompt_type}")

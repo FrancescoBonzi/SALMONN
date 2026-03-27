@@ -47,7 +47,7 @@ class SALMONNDataset(Dataset):
         Q = [s["Q"] for s in samples]
         id = [s["id"] for s in samples]
 
-        return {
+        result = {
             "spectrogram": cat_spectrogram,
             "raw_wav": raw_wav,
             "padding_mask": paddding_mask,
@@ -56,6 +56,13 @@ class SALMONNDataset(Dataset):
             "Q": Q,
             "id": id,
         }
+        
+        # For reasoning tasks: add question and answer only if present
+        if any("question" in s for s in samples):
+            result["question"] = [s.get("question", "") for s in samples]
+            result["answer"] = [s.get("answer", "") for s in samples]
+
+        return result
 
     def __getitem__(self, index):
         ann = self.annotation[index]
@@ -76,11 +83,11 @@ class SALMONNDataset(Dataset):
         audio = audio[: sr * 30] # truncate audio to at most 30s
 
         spectrogram = self.wav_processor(audio, sampling_rate=sr, return_tensors="pt")["input_features"].squeeze()
-        text = ann["text"]
+        text = ann.get("text", "")
         task = ann.get("task", "asr")
         Q = ann.get("Q", "")
 
-        return {
+        result = {
             "spectrogram": spectrogram,
             "raw_wav": audio,
             "text": text,
@@ -88,3 +95,10 @@ class SALMONNDataset(Dataset):
             "Q": Q,
             "id": ann["path"],
         }
+        
+        # For reasoning tasks: add question and answer only if present
+        if "question" in ann:
+            result["question"] = ann["question"]
+            result["answer"] = ann.get("answer", "")
+
+        return result

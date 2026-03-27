@@ -1,0 +1,16 @@
+{
+    "annotation": [
+      {
+        "path": "data/afthink_debug/samples/Pas sur le sol.wav",
+        "task": "afthink_reasoning",
+        "answer": "<SUMMARY> The question asks to identify the most likely activity based on an audio. I will first determine the primary sound or pattern in the audio. Then, I will correlate this sound with the activities listed in the options. Finally, I will select the activity that best matches the sound characteristics and contextual clues. </SUMMARY>\n<CAPTION> Skateboard rolls on rough surface, followed by angry exclamation, vehicle engine revs up, and thumping sound heard. </CAPTION>\n<REASONING> The primary sound in the audio is a repetitive, rhythmic grinding or skidding noise. This sound pattern aligns most closely with the activity of a skateboarder practicing tricks on a rough surface, as skateboard wheels interacting with uneven terrain produce similar auditory characteristics. Other options (jogging, cycling, drilling) do not match the described sound pattern. </REASONING>\n<CONCLUSION> (D) A skateboarder practicing tricks on a rough surface </CONCLUSION>",
+        "question": "Based on the audio, which activity is most likely occurring? Choose one among the following options:\n(A) A person jogging on gravel\n(B) A cyclist pedaling on a rough terrain\n(C) A construction worker using a drill\n(D) A skateboarder practicing tricks on a rough surface."
+      },
+      {
+        "path": "data/afthink_debug/samples/Bear Last Audio.wav",
+        "task": "afthink_reasoning",
+        "answer": "<SUMMARY> The question asks to identify an event based on excitement, engine sounds, and upbeat electronic music. I will first determine the typical context of engine sounds, then assess the setting for upbeat electronic music, and finally combine these elements to deduce the most likely event. </SUMMARY>\n<CAPTION> Woman expresses excitement with revving engine sounds, complemented by upbeat electronic music. </CAPTION>\n<REASONING> Engine sounds are typically associated with motor vehicles, narrowing the context to events involving vehicles. Upbeat electronic music is commonly linked to energetic environments like races or performances. The combination of engine noises (suggesting a motorcycle or vehicle competition) and electronic music (enhancing the excitement of a race) points to a motorcycle race as the most specific and fitting event. </REASONING>\n<CONCLUSION> (C) motorcycle race </CONCLUSION>",
+        "question": "What type of event is likely depicted by the combination of excitement, engine sounds, and upbeat electronic music? Choose one among the following options:\n(A) music concert\n(B) classroom lecture\n(C) motorcycle race\n(D) cooking show."
+      }
+    ]
+}

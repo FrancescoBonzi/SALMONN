@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=1:0:0
+#SBATCH --time=4:0:0
 #SBATCH --account=aip-csubakan
 #SBATCH --cpus-per-task=48
 #SBATCH --mem=488G
@@ -16,8 +16,8 @@ seed=${seeds[$SLURM_ARRAY_TASK_ID]}
 
 # Define config variables
 model_type="salmonn"
-ckpt_type="finetuned"
-prompt_type="afthink"
+ckpt_type="pretrained"
+prompt_type="official_reasoning"
 eval_filename="${model_type}_13B_${ckpt_type}_${prompt_type}prompt/seed${seed}.json"
 
 # Copy data to SLURM_TMPDIR for fast I/O
@@ -48,8 +48,11 @@ COPY_VICUNA_PID=$!
 cp "pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt" "$SLURM_TMPDIR/pretrained/" &
 COPY_BEATS_PID=$!
 
+cp "pretrained/salmonn_v1.pth" "$SLURM_TMPDIR/pretrained/" &
+COPY_SALMONN_PID=$!
+
 # Wait for all copies to finish
-wait $COPY_WHISPER_PID $COPY_VICUNA_PID $COPY_BEATS_PID
+wait $COPY_WHISPER_PID $COPY_VICUNA_PID $COPY_BEATS_PID $COPY_SALMONN_PID
 echo "Pretrained models copy complete!"
 
 # Update annotation paths to point to SLURM_TMPDIR
@@ -62,9 +65,8 @@ module load StdEnv/2023 cuda/12.2
 module load httpproxy
 source .venv/bin/activate
 
-# Find the output directory
-OUTPUT_DIR=$(ls -dt outputs/afthink_youtube8m/$model_type/$seed/* | head -n 1)
-BEST_CKPT="${OUTPUT_DIR}/checkpoint_best.pth"
+# Use pretrained checkpoint
+BEST_CKPT="$SLURM_TMPDIR/pretrained/salmonn_v1.pth"
 
 echo "Using checkpoint: $BEST_CKPT"
 
