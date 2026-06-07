@@ -1,85 +1,174 @@
-# SALMONN: Speech Audio Language Music Open Neural Network
+# SPARE
 
-<div align=center><img src="resource/salmon.png" height="256px" width="256px"/></div>
+Reference code for **SPARE** (Semantic Prediction for Audio REasoning), from the paper *Enhancing Audio Reasoning via Semantic Summary Prediction* (Interspeech 2026).
 
-<h1 align="center">
-  <a href="https://git.io/typing-svg">
-    <img src="https://readme-typing-svg.herokuapp.com/?lines=Hello,+There!+👋;Welcome+to+SALMONN;&center=true&size=30">
-  </a>
-</h1>
+Built on [SALMONN 13B](https://github.com/bytedance/SALMONN).
 
-🚀🚀 Welcome to the repo of **SALMONN**!
+## what is this
 
-SALMONN is a large language model (LLM) enabling **speech, audio events, and music inputs**, which is developed by the Department of Electronic Engineering at Tsinghua University and ByteDance. Instead of speech-only input or audio-event-only input, SALMONN can perceive and understand all kinds of audio inputs and therefore obtain emerging capabilities such as multilingual speech recognition and translation and audio-speech co-reasoning. This can be regarded as giving the LLM "ears" and cognitive hearing abilities, which makes SALMONN a step towards hearing-enabled artificial general intelligence.
+Large audio-language models often have a **reasoning gap**: explicit chain-of-thought (CoT) hurts accuracy because attention drifts from the audio to the text the model already generated.
 
-<div style='display:flex; gap: 0.25rem; '>
-<a href='https://openreview.net/pdf?id=14rn7HpKVk'><img src='https://img.shields.io/badge/SALMONN_paper-PDF-green'></a>
-<a href='https://huggingface.co/tsinghua-ee/SALMONN'><img src='https://img.shields.io/badge/SALMONN--13B-checkpoint-yellow'></a> 
-<a href='https://huggingface.co/tsinghua-ee/SALMONN-7B'><img src='https://img.shields.io/badge/SALMONN--7B-checkpoint-yellow'></a>
-</div>
+SPARE fixes this at training time. You inject a register token `[REG]` right after the audio/prompt and before the reasoning chain:
 
-## 🔥 News
-- [2024-05-28] 🧳 We have released all the annotations (including 600k SQA/AQA data and 50k audio-based storytelling data) for the 3-stage training of SALMONN! Feel free to download them [here](https://drive.google.com/file/d/15cQO--rtMM9JD22y-A5oXXvT3DujgE2e/view?usp=sharing)!
-- [2024-04-07] 🤖 We have released all the codes you need to train your own SALMONN! Try some cool things!
-- [2024-01-16] 💖 Our paper was accepted by ICLR 2024!
-- [2023-11-13] 🎁 We have released a **7B version of SALMONN** at [tsinghua-ee/SALMONN-7B](https://huggingface.co/tsinghua-ee/SALMONN-7B) and built the 7B demo [here](https://huggingface.co/spaces/tsinghua-ee/SALMONN-7B-gradio)!
-- [2023-10-08] ✨ We have released [**the model checkpoint**](https://huggingface.co/tsinghua-ee/SALMONN) and **the inference code** for SALMONN-13B!
-
-## 🌟 Structure
-
-The model architecture of SALMONN is shown below. A window-level Q-Former is used as the connection module to fuse the outputs from a Whisper speech encoder and a BEATs audio encoder as augmented audio tokens, which are aligned with the LLM input space. The LoRA adaptor aligns the augmented LLM input space with its output space. The text prompt is used to instruct SALMONN to answer open-ended questions about the general audio inputs and the answers are in the LLM text responses. 
-
-<div align=center><img src="resource/structure.png" height="100%" width="75%"/></div>
-
-## ⚡️ Demos
-
-Compared with traditional speech and audio processing tasks such as speech recognition and audio caption, SALMONN leverages the general knowledge and cognitive abilities of the LLM to achieve a cognitively oriented audio perception, which dramatically improves the versatility of the model and the richness of the task. In addition, SALMONN is able to follow textual commands and even spoken commands with a relatively high degree of accuracy. Since SALMONN only uses training data based on textual commands, listening to spoken commands is also a cross-modal emergent ability.
-
-Here are some examples of SALMONN.
-
-| Audio                                                  | Response                                     |
-| ------------------------------------------------------ | -------------------------------------------- |
-| [gunshots.wav](./resource/audio_demo/gunshots.wav)     | ![sac](resource/response_demo/sac.png)       |
-| [duck.wav](./resource/audio_demo/duck.wav)             | ![story](resource/response_demo/story.png)   |
-| [music.wav](./resource/audio_demo/music.wav)           | ![mc](resource/response_demo/mc.png)         |
-
-
-## 🌈 How to train a model
-
-For SALMONN-13B v1, you need to use the following dependencies:
-1. Our environment: The python version is 3.9.17, and other required packages can be installed with the following command: ```pip install -r requirements.txt```.
-2. Download [whisper large v2](https://huggingface.co/openai/whisper-large-v2/tree/main) to ```whisper_path```.
-3. Download [Fine-tuned BEATs_iter3+ (AS2M) (cpt2)](https://1drv.ms/u/s!AqeByhGUtINrgcpj8ujXH1YUtxooEg?e=E9Ncea) to `beats_path`.
-4. Download [vicuna 13B v1.1](https://huggingface.co/lmsys/vicuna-13b-v1.1/tree/main) to ```llama_path```.
-5. Running with ```python3 train.py --cfg-path configs/config.yaml``` in A100-SXM-80GB.
-
-## 🌈 How to inference in CLI
-
-1. Same as **How to train a model: 1-4**.
-2. Download [salmonn v1](https://huggingface.co/tsinghua-ee/SALMONN/blob/main/salmonn_v1.pth) to ```ckpt```.
-3. Running with ```python3 cli_inference.py --cfg-path configs/decode_config.yaml``` in A100-SXM-80GB. Now you can input ```wav_path``` and ```prompt```. Enjoy yourself !
-
-## 🌈 How to launch a web demo
-
-1. Same as **How to train a model: 1-4**.
-2. Download [salmonn v1](https://huggingface.co/tsinghua-ee/SALMONN/blob/main/salmonn_v1.pth) to ```ckpt```.
-3. Running with ```python3 web_demo.py --cfg-path configs/decode_config.yaml``` in A100-SXM-80GB.
-
-## 👀 Team
-
-**Team Tsinghua**: Wenyi Yu, Changli Tang, Guangzhi Sun, Chao Zhang
-
-**Team ByteDance**: Xianzhao Chen, Wei Li, Tian Tan, Lu Lu, Zejun Ma
-
-## ✨ Citation
-If you find SALMONN useful, please cite the paper:
 ```
-@inproceedings{
-  tang2024salmonn,
+[Question, Audio, Choices, [REG], <SUMMARY>..., <CAPTION>..., <REASONING>..., <CONCLUSION>...]
+```
+
+During training, the hidden state of `[REG]` is aligned to a frozen [Sentence-BERT](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) embedding of the conclusion (cosine similarity loss). Total loss:
+
+```
+L = L_CE + λ · L_align     (λ = 2.0 in the paper)
+```
+
+At inference, `[REG]` and the projection head are dropped. Same decoding as standard SFT, zero extra cost.
+
+![SPARE training framework](resource/spare_method.png)
+
+**Results** (zero-shot, SALMONN 13B backbone, MMAU / MMAR):
+
+| Method | MMAU | MMAR |
+|---|---|---|
+| Zero-shot | 36.0% | 33.3% |
+| Zero-shot (CoT) | 18.0% | 12.3% |
+| SFT | 54.7% | 38.2% |
+| Audio MuToR | 53.0% | 38.4% |
+| **SPARE** | **58.0%** | **40.3%** |
+
+## install
+
+```bash
+git clone <this-repo>
+cd SALMONN
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt huggingface_hub
+```
+
+GPU recommended. Full pretrained weights ~80GB. Debug runs with tiny models.
+
+## quick start (debug)
+
+Debug data is bundled in `resource/afthink_debug/` (2 wav files, a few annotations). No prep needed.
+
+```bash
+wget -O pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt \
+  "https://huggingface.co/THUdyh/Ola_speech_encoders/resolve/main/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt?download=true"
+
+hf download openai/whisper-tiny --local-dir pretrained/whisper-tiny
+python recipes/create_mock_llm.py
+
+python train.py --cfg-path recipes/afthink/debug.yaml
+```
+
+Optional attention analysis after training:
+
+```bash
+python eval/visualize_attention.py \
+  --cfg-path recipes/afthink/debug.yaml \
+  --options model.ckpt=outputs/afthink_debug/<run_id>/checkpoint_best.pth
+```
+
+## full experiments
+
+### pretrained models
+
+```bash
+bash recipes/download_pretrained.sh
+```
+
+Downloads Whisper-large-v2, BEATs, Vicuna-13B, and `salmonn_v1.pth` into `pretrained/`.
+
+### training data
+
+Fine-tuning uses [AF-Think](https://huggingface.co/datasets/nvidia/AF-Think) labels on a YouTube8M subset (160k train / 40k val in the paper). Each sample has four chapters: `<SUMMARY>`, `<CAPTION>`, `<REASONING>`, `<CONCLUSION>`.
+
+1. Put `AFThink.tar.gz` at `data/YouTube8M/AFThink.tar.gz`
+2. `python recipes/afthink/prepare_cot_youtube8m.py`
+3. Resample mp3 → 16 kHz wav:
+
+```bash
+cd data/YouTube8M/audio_files
+find . -maxdepth 1 -name "*.mp3" -print0 | \
+  parallel -0 -j 48 ffmpeg -i {} -ar 16000 -ac 1 -c:a pcm_s16le {.}.wav
+```
+
+**MMAU** eval: download `test-mini-audios.tar` [here](https://drive.usercontent.google.com/download?id=1fERNIyTa0HWry6iIG1X-1ACPlUlhlRWA&export=download) → `data/MMAU/`, then `python recipes/mmau/prepare_mmau.py`.
+
+**MMAR** eval: `python recipes/mmar/prepare_mmar.py`.
+
+### train
+
+Recipes in `recipes/afthink/`. Set `datasets.*_ann_path` in the yaml (shipped empty). Paper configs:
+
+| Recipe | What it reproduces |
+|---|---|
+| `salmonn.yaml` | SFT baseline |
+| `mutor.yaml` | Audio MuToR baseline |
+| `mutor_with_alpha_decay.yaml` | Audio MuToR with λ decay |
+| `bert_conclusion_spare.yaml` | **SPARE** (single `[REG]`, set `mutor_alpha: 2.0`) |
+| `bert_multi_conclusion_spare.yaml` | Multi-conclusion ablation (register per chapter) |
+| `cot_salmonn.yaml` | CoT-focused training variant |
+
+```bash
+torchrun --nproc_per_node=4 train.py \
+  --cfg-path recipes/afthink/bert_conclusion_spare.yaml \
+  --options \
+    model.mutor_alpha=2.0 \
+    datasets.train_ann_path=data/YouTube8M/annotations/train_youtube8m.json \
+    datasets.valid_ann_path=data/YouTube8M/annotations/test_youtube8m.json \
+    datasets.test_ann_path=data/YouTube8M/annotations/test_youtube8m.json
+```
+
+Or the full train + eval pipeline:
+
+```bash
+MODEL_TYPE=bert_conclusion_spare bash run_youtube8m.sh
+```
+
+## eval
+
+Benchmarks: [MMAU](https://arxiv.org/abs/2410.19168) and [MMAR](https://arxiv.org/abs/2505.03054). Evaluations are zero-shot with `--prompt-type afthink` (CoT output, conclusion extracted for scoring).
+
+```bash
+python eval/evaluate_mmau.py \
+  --cfg-path recipes/afthink/bert_conclusion_spare.yaml \
+  --ckpt outputs/bert_conclusion_spare/<run_id>/checkpoint_best.pth \
+  --prompt-type afthink \
+  --output-file outputs/mmau/spare_seed1.json \
+  --options datasets.test_ann_path=data/MMAU/annotations/test_mmau.json
+```
+
+MMAR: same with `eval/evaluate_mmar.py`. Shell wrappers: `bash eval/eval_benchmarks.sh`, `bash eval/eval_benchmarks_salmonn_.sh` (pretrained baseline), `bash eval/eval_attention.sh`.
+
+## qualitative analysis
+
+- `eval/visualize_attention.py` — attention maps (mechanistic analysis from the paper)
+- `eval/analyze_mmau_caption_words.py` — caption length vs correctness
+- `eval/compare_model_outputs.py` — overlap of correct samples between two runs
+
+## structure
+
+```
+train.py                        training
+models/salmonn.py               SALMONN, MuToR, SPARE classes
+recipes/afthink/                configs + data prep
+eval/                           eval + analysis
+resource/afthink_debug/         bundled debug data
+```
+
+## cite
+
+```bibtex
+@inproceedings{spare2026,
+  title={Enhancing Audio Reasoning via Semantic Summary Prediction},
+  author={Anonymous},
+  booktitle={Interspeech},
+  year={2026}
+}
+
+@inproceedings{tang2024salmonn,
   title={{SALMONN}: Towards Generic Hearing Abilities for Large Language Models},
   author={Changli Tang and Wenyi Yu and Guangzhi Sun and Xianzhao Chen and Tian Tan and Wei Li and Lu Lu and Zejun MA and Chao Zhang},
-  booktitle={The Twelfth International Conference on Learning Representations},
-  year={2024},
-  url={https://openreview.net/forum?id=14rn7HpKVk}
+  booktitle={ICLR},
+  year={2024}
 }
 ```

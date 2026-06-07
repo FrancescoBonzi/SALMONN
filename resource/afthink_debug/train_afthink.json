@@ -1,25 +1,25 @@
 {
     "annotation": [
       {
-        "path": "data/afthink_debug/samples/Pas sur le sol.wav",
+        "path": "resource/afthink_debug/samples/Pas sur le sol.wav",
         "task": "afthink_reasoning",
         "answer": "<SUMMARY> The question examines how the speaker's tone and background sounds support instructional clarity. I will first analyze the speaker's tone aspects like clarity and enthusiasm, then assess background sounds for distractions or enhancements, and finally evaluate how these elements together reinforce the teaching objective. </SUMMARY>\n<CAPTION> A male speaker explains how to use a protractor to get the bearing, amidst background tool use noises. </CAPTION>\n<REASONING> The speaker's clear, steady tone and measured pace establish authority and focus, essential for instructional clarity. Background sounds like tool use noises and breathing provide contextual realism, grounding the explanation in a practical setting. Together, these elements create an immersive, disciplined environment that enhances the instructional purpose by maintaining listener engagement and reinforcing procedural accuracy. </REASONING>\n<CONCLUSION> The calm and steady tone combined with subtle tool sounds creates a focused and clear instructional environment, helping listeners understand the practical use of a protractor for getting bearings. </CONCLUSION>",
         "question": "How does the speaker's tone and background sounds contribute to the instructional nature of the explanation about using a protractor?"
       },
       {
-        "path": "data/afthink_debug/samples/Bear Last Audio.wav",
+        "path": "resource/afthink_debug/samples/Bear Last Audio.wav",
         "task": "afthink_reasoning",
         "answer": "<SUMMARY> The question asks to identify an event based on excitement, engine sounds, and upbeat electronic music. I will first determine the typical context of engine sounds, then assess the setting for upbeat electronic music, and finally combine these elements to deduce the most likely event. </SUMMARY>\n<CAPTION> Woman expresses excitement with revving engine sounds, complemented by upbeat electronic music. </CAPTION>\n<REASONING> Engine sounds are typically associated with motor vehicles, narrowing the context to events involving vehicles. Upbeat electronic music is commonly linked to energetic environments like races or performances. The combination of engine noises (suggesting a motorcycle or vehicle competition) and electronic music (enhancing the excitement of a race) points to a motorcycle race as the most specific and fitting event. </REASONING>\n<CONCLUSION> (C) motorcycle race </CONCLUSION>",
         "question": "What type of event is likely depicted by the combination of excitement, engine sounds, and upbeat electronic music? Choose one among the following options:\n(A) music concert\n(B) classroom lecture\n(C) motorcycle race\n(D) cooking show."
       },
       {
-        "path": "data/afthink_debug/samples/Pas sur le sol.wav",
+        "path": "resource/afthink_debug/samples/Pas sur le sol.wav",
         "task": "afthink_reasoning",
         "answer": "<SUMMARY> The question asks to identify the main sound type in the audio. I will first identify all sound types present, then determine which is most dominant, and finally check if there is a clear primary type or multiple equally prominent sounds. </SUMMARY>\n<CAPTION> Crowd cheers and applauds, followed by an emotional male voice, source of excitement undisclosed. </CAPTION>\n<REASONING> Generate a caption for the audio: A crowd is cheering and clapping, and a man is speaking. Identify the dominant sound type: The crowd cheering and applause are the most prominent and continuous sounds. Match to the options: Crowd cheering and applause correspond to option (A). </REASONING>\n<CONCLUSION> (A) Crowd cheering and applause </CONCLUSION>",
         "question": "What is the primary type of sound described in the audio? Choose one among the following options:\n(A) Crowd cheering and applause\n(B) Nature sounds\n(C) Animal sounds\n(D) Mechanical noises."
       },
       {
-        "path": "data/afthink_debug/samples/Bear Last Audio.wav",
+        "path": "resource/afthink_debug/samples/Bear Last Audio.wav",
         "task": "afthink_reasoning",
         "answer": "<SUMMARY> The question aims to identify the setting based on auditory cues. I will first analyze the specific sounds or ambient noises in the audio, then determine which of the listed settings (gym, office, classroom, library) are typically associated with those sounds, and finally select the setting that best matches the identified auditory elements. </SUMMARY>\n<CAPTION> A female voice types rhythmically on a keyboard while speaking indistinctly. </CAPTION>\n<REASONING> The audio contains typing sounds and background noise, which are commonly associated with office environments. While libraries may have background noise, the presence of typing strongly indicates an office setting. Classrooms and gyms are less likely due to the absence of typing and the presence of distinct ambient sounds typical of those locations. </REASONING>\n<CONCLUSION> (B) An office </CONCLUSION>",
         "question": "What setting might this scene be depicting? Choose one among the following options:\n(A) gym\n(B) An office\n(C) classroom\n(D) library."

@@ -1,3 +1,8 @@
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import argparse
 import json
 import os
@@ -270,7 +275,7 @@ if __name__ == "__main__":
     Evaluate SALMONN MMAR performance.
 
     Usage:
-        python evaluate.py \
+        python eval/evaluate_mmar.py \
             --cfg-path recipes/mmar/salmonn.yaml \
             --ckpt <checkpoint_path> \
     """

@@ -2,12 +2,11 @@
 # Uses lightweight models for fast iteration and debugging
 
 model:
-  model_type: "salmonn"
+  model_type: "bert_conclusion_spare"
   
-  # MuToR hyperparameters
-  mutor_min_offset: 1
-  mutor_max_offset: 2
-  mutor_alpha: 0.1
+  # ConclusionFocusSALMONN hyperparameters
+  alpha_min: 0.1
+  alpha_max: 2.0
 
   # Mock LLaMA for CPU debugging (~19M params)
   llama_path: "pretrained/mock-llama"
@@ -40,19 +39,19 @@ model:
   prompt_template: "USER: {}\nASSISTANT:"
   prompt_path: "prompts/train_prompt.json"
   test_prompt_path: "prompts/test_prompt.json"
-  max_txt_len: 200
+  max_txt_len: 300
   end_sym: "</s>"
 
 datasets:
-  train_ann_path: "data/afthink_debug/train_afthink.json"
-  valid_ann_path: "data/afthink_debug/valid_afthink.json"
-  test_ann_path: "data/afthink_debug/test_afthink.json"
+  train_ann_path: "resource/afthink_debug/train_afthink.json"
+  valid_ann_path: "resource/afthink_debug/train_afthink.json"
+  test_ann_path: "resource/afthink_debug/test_afthink.json"
 
   whisper_path: "pretrained/whisper-tiny"
 
 run:
   seed: 42
-  output_dir: "outputs/afthink_debug/mutor"
+  output_dir: "outputs/afthink_debug/bert_conclusion_spare"
   evaluate: False
   save_only_best: True
 

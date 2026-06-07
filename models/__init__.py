@@ -20,23 +20,11 @@ def load_model(config):
         return SALMONN.from_config(config)
     elif model_type == "cot_salmonn":
         return CoTSALMONN.from_config(config)
-    elif model_type == "conclusion_focus_salmonn":
-        return ConclusionFocusSALMONN.from_config(config)
-    elif model_type == "reverse_salmonn":
-        return ReverseSALMONN.from_config(config)
     elif model_type == "mutor":
         return MutorSALMONN.from_config(config)
-    elif model_type == "mutor_bert_summary":
-        return MutorBERTSummarySALMONN.from_config(config)
-    elif model_type == "mutor_bert_conclusion":
-        return MutorBERTConclusionSALMONN.from_config(config)
-    elif model_type == "mutor_bert_multi_conclusion":
-        return MutorBERTMultiConclusionSALMONN.from_config(config)
-    elif model_type == "caption_attention_salmonn":
-        return CaptionAttentionSALMONN.from_config(config)
-    elif model_type == "chapter_attention_salmonn":
-        return ChapterAttentionSALMONN.from_config(config)
-    elif model_type == "mutor_bert_triplet_loss":
-        return MutorBERTTripletLossSALMONN.from_config(config)
+    elif model_type == "bert_conclusion_spare":
+        return BERTConclusionSPARE.from_config(config)
+    elif model_type == "bert_multi_conclusion_spare":
+        return BERTMultiConclusionSPARE.from_config(config)
     else:
         raise ValueError(f"Invalid model type: {model_type}")

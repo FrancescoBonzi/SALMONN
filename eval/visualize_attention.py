@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """
-Visualize attention maps for MutorBERTConclusionSALMONN.
+Visualize attention maps for BERTConclusionSPARE.
 
 Usage:
-  python visualize_attention.py --cfg-path recipes/afthink/debug.yaml
+  python eval/visualize_attention.py --cfg-path recipes/afthink/debug.yaml
 """
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import argparse
 import json

@@ -173,3 +173,7 @@ outputs/
 notebooks/
 annotations/
 test-mini-audios.tar
+mmau_caption_analysis_out/
+
+# Ignore large datasets (bundled debug set lives in resource/afthink_debug/)
+data/*
