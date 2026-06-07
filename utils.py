@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+import re
 import time
 import string
 
@@ -165,6 +166,14 @@ def prepare_one_sample(wav_path, wav_processor, cuda_enabled=True):
 ########################
 
 
+def _format_choice(letter: str, choice: str) -> str:
+    """Format a multiple-choice option, avoiding duplicate (A) prefixes."""
+    choice = choice.strip()
+    if re.match(r"^\([A-Z]\)\s", choice):
+        return choice
+    return f"({letter}) {choice}"
+
+
 def pretrained_prompt_template(batch, metadata, cfg):
     # Create prompts for batch
     prompts = []
@@ -223,7 +232,7 @@ def afthink_prompt_template(batch, metadata, cfg):
             else:
                 question += "."
         choices = "\n".join([
-            f"({letter}) {choice}" 
+            _format_choice(letter, choice)
             for letter, choice in zip(
                 string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
             )
@@ -246,7 +255,7 @@ def afthink_no_reasoning_prompt_template(batch, metadata, cfg):
             else:
                 question += "."
         choices = "\n".join([
-            f"({letter}) {choice}" 
+            _format_choice(letter, choice)
             for letter, choice in zip(
                 string.ascii_uppercase[:len(metadata[id]["choices"])], metadata[id]["choices"]
             )

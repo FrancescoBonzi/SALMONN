@@ -91,7 +91,7 @@ find . -maxdepth 1 -name "*.mp3" -print0 | \
   parallel -0 -j 48 ffmpeg -i {} -ar 16000 -ac 1 -c:a pcm_s16le {.}.wav
 ```
 
-**MMAU** eval: download `test-mini-audios.tar` [here](https://drive.usercontent.google.com/download?id=1fERNIyTa0HWry6iIG1X-1ACPlUlhlRWA&export=download) → `data/MMAU/`, then `python recipes/mmau/prepare_mmau.py`.
+**MMAU** eval: `python recipes/mmau/prepare_mmau.py` (downloads [MMAU-test-mini](https://huggingface.co/datasets/gamma-lab-umd/MMAU-test-mini) from HuggingFace and writes `data/MMAU/audio_files/` + `data/MMAU/annotations/test_mmau.json`).
 
 **MMAR** eval: `python recipes/mmar/prepare_mmar.py`.
 

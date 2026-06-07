@@ -1,112 +1,143 @@
-import os
+"""Prepare MMAU test-mini from the official HuggingFace parquet release.
+
+Dataset: https://huggingface.co/datasets/gamma-lab-umd/MMAU-test-mini
+
+Audio is embedded in the parquet `context` column. This script extracts it,
+resamples to 16 kHz WAV files, and writes SALMONN-compatible annotations.
+"""
+
+import argparse
+import io
 import json
 from pathlib import Path
-import shutil
-import urllib.request
-import zipfile
-import tarfile
-import numpy as np
-import soundfile as sf
+
 import librosa
+import numpy as np
+import pyarrow.parquet as pq
+import soundfile as sf
+from huggingface_hub import hf_hub_download
 from tqdm import tqdm
 
-TARGET_SAMPLE_RATE = 16000  # Whisper expects 16 kHz
-AUDIO_EXTENSIONS = {".wav", ".flac", ".ogg"}
+TARGET_SAMPLE_RATE = 16000
+HF_DATASET = "gamma-lab-umd/MMAU-test-mini"
+HF_PARQUET = "test_mini.parquet"
 
 
-def resample_audio_dir(root_dir: Path, target_sr: int = TARGET_SAMPLE_RATE):
-    """Resample all audio files under root_dir to target_sr (16 kHz for Whisper)."""
-    root_dir = Path(root_dir)
-    resampled = 0
-    for path in root_dir.rglob("*"):
-        if path.suffix.lower() not in AUDIO_EXTENSIONS or not path.is_file():
-            continue
-        try:
-            audio, sr = sf.read(path)
-            if sr == target_sr:
-                continue
-            if len(audio.shape) == 2:
-                audio = audio.mean(axis=1)
-            audio = librosa.resample(audio, orig_sr=sr, target_sr=target_sr)
-
-            # Normalize audio peak
-            audio = audio / (np.abs(audio).max() + 1e-9)
-
-            sf.write(path, audio, target_sr)
-            resampled += 1
-        except Exception as e:
-            print(f"Warning: failed to resample {path}: {e}")
-    if resampled:
-        print(f"Resampled {resampled} audio file(s) to {target_sr} Hz.")
+def decode_audio_bytes(audio_bytes: bytes) -> tuple[np.ndarray, int]:
+    audio, sr = sf.read(io.BytesIO(audio_bytes))
+    if audio.ndim == 2:
+        audio = audio.mean(axis=1)
+    return audio.astype(np.float32), int(sr)
 
 
-def prepare_mmau_annotations(output_dir: str):
-    """Load MMAU from Hugging Face and write train_mmau.json."""
-    os.makedirs(output_dir, exist_ok=True)
+def resample_audio(audio: np.ndarray, sr: int, target_sr: int = TARGET_SAMPLE_RATE) -> np.ndarray:
+    if sr == target_sr:
+        return audio
+    return librosa.resample(audio, orig_sr=sr, target_sr=target_sr).astype(np.float32)
+
+
+def normalize_audio(audio: np.ndarray) -> np.ndarray:
+    peak = np.abs(audio).max()
+    if peak > 0:
+        audio = audio / (peak + 1e-9)
+    return audio
+
+
+def parse_other_attributes(raw_attrs) -> dict:
+    if isinstance(raw_attrs, str):
+        return json.loads(raw_attrs)
+    return raw_attrs
+
+
+def prepare_mmau(
+    output_dir: Path,
+    dataset_name: str = HF_DATASET,
+    parquet_file: str = HF_PARQUET,
+    skip_existing_audio: bool = True,
+):
     output_dir = Path(output_dir)
+    audio_dir = output_dir / "audio_files"
+    ann_dir = output_dir / "annotations"
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    ann_dir.mkdir(parents=True, exist_ok=True)
 
-    url = "https://github.com/Sakshi113/MMAU/archive/refs/heads/main.zip"
-    archive_path = output_dir / "main.zip"
-    if not archive_path.exists():
-        print("Downloading main.zip...")
-        urllib.request.urlretrieve(url, archive_path)
-    print("Extracting...")
-    with zipfile.ZipFile(archive_path, "r") as zf:
-        zf.extractall(output_dir)
-
-    test_mini_json = output_dir / "MMAU-main" / "mmau-test-mini.json"
-    with open(test_mini_json, "r") as f:
-        test_mini_data = json.load(f)
+    print(f"Downloading {dataset_name}/{parquet_file} from HuggingFace...")
+    parquet_path = hf_hub_download(dataset_name, parquet_file, repo_type="dataset")
+    table = pq.read_table(
+        parquet_path,
+        columns=["context", "instruction", "choices", "answer", "other_attributes"],
+    )
+    rows = table.to_pylist()
+    print(f"Loaded {len(rows)} samples.")
 
     annotations = []
-    for item in tqdm(test_mini_data):
-        audio_path = str(output_dir / "audio_files" / Path(item["id"] + ".wav"))
+    for row in tqdm(rows, desc="Extracting audio"):
+        attrs = parse_other_attributes(row["other_attributes"])
+        sample_id = attrs["id"]
+        audio_path = audio_dir / f"{sample_id}.wav"
+
+        if not (skip_existing_audio and audio_path.exists()):
+            audio_bytes = row["context"]["bytes"]
+            if not audio_bytes:
+                raise ValueError(f"Missing audio bytes for sample {sample_id}")
+
+            audio, sr = decode_audio_bytes(audio_bytes)
+            audio = resample_audio(audio, sr)
+            audio = normalize_audio(audio)
+            sf.write(audio_path, audio, TARGET_SAMPLE_RATE)
+
         annotations.append({
-            "path": audio_path,
-            "text": item["answer"],
-            **{key: value for key, value in item.items() if key != "audio_id" and key != "answer"}
+            "path": str(audio_path.resolve()),
+            "text": row["answer"],
+            "id": sample_id,
+            "question": row["instruction"],
+            "choices": row["choices"],
+            "answer": row["answer"],
+            "task": attrs["task"],
+            "difficulty": attrs["difficulty"],
+            "sub-category": attrs.get("sub-category"),
+            "dataset": attrs.get("dataset"),
+            "category": attrs.get("category"),
+            "split": attrs.get("split"),
         })
 
-    ann_path = output_dir / "annotations" / "test_mmau.json"
-    os.makedirs(ann_path.parent, exist_ok=True)
+    ann_path = ann_dir / "test_mmau.json"
     with open(ann_path, "w") as f:
         json.dump({"annotation": annotations}, f, indent=2)
-    print(f"Saved {len(annotations)} samples to {ann_path}")
 
-    if (output_dir / "MMAU-main").exists():
-        shutil.rmtree(output_dir / "MMAU-main")
-        print("Removed", output_dir / "MMAU-main")
+    print(f"Saved {len(annotations)} annotations to {ann_path}")
+    print(f"Audio files in {audio_dir}")
+    return ann_path
 
-    if (output_dir / "main.zip").exists():
-        os.remove(output_dir / "main.zip")
-        print("Removed", output_dir / "main.zip")
+
+def main():
+    parser = argparse.ArgumentParser(description="Prepare MMAU test-mini from HuggingFace parquet.")
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Output directory (default: <repo>/data/MMAU)",
+    )
+    parser.add_argument("--dataset", default=HF_DATASET, help="HuggingFace dataset id")
+    parser.add_argument("--parquet-file", default=HF_PARQUET, help="Parquet filename in the dataset repo")
+    parser.add_argument(
+        "--force-audio",
+        action="store_true",
+        help="Re-extract audio even if WAV files already exist",
+    )
+    args = parser.parse_args()
+
+    script_dir = Path(__file__).resolve().parent
+    output_dir = args.output_dir or (script_dir.parent.parent / "data" / "MMAU")
+
+    prepare_mmau(
+        output_dir=output_dir,
+        dataset_name=args.dataset,
+        parquet_file=args.parquet_file,
+        skip_existing_audio=not args.force_audio,
+    )
+    print("Done.")
 
 
 if __name__ == "__main__":
-    script_dir = Path(__file__).resolve().parent
-    data_dir = script_dir.parent.parent / "data" / "MMAU"
-    data_dir.mkdir(parents=True, exist_ok=True)
-
-    # Extract MMAU test-mini-audios.tar
-    archive_path = data_dir / "test-mini-audios.tar"
-    if not archive_path.exists():
-        raise FileNotFoundError(f"MMAU test-mini-audios.tar not found at {archive_path}, \
-            downlad it from https://drive.usercontent.google.com/download?id=1fERNIyTa0HWry6iIG1X-1ACPlUlhlRWA&export=download&authuser=0")
-
-    audio_files_dir = data_dir / "audio_files"
-    with tarfile.open(archive_path, "r") as tf:
-        tf.extractall(data_dir)
-
-    # Rename test-mini-audios/ to audio_files/
-    shutil.move(data_dir / "test-mini-audios", audio_files_dir)
-
-    print("Resampling audio to 16 kHz for Whisper...")
-    resample_audio_dir(audio_files_dir)
-
-    prepare_mmau_annotations(str(data_dir))
-
-    #if archive_path.exists():
-    #    archive_path.unlink()
-    #    print("Removed", archive_path.name)
-
-    print("Done. Dataset in", data_dir)
+    main()
