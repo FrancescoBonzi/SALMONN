@@ -47,7 +47,7 @@ GPU recommended. Full pretrained weights ~80GB. Debug runs with tiny models.
 
 ## Quick Start (Debug)
 
-Debug data is bundled in `resource/afthink_debug/` (2 wav files, a few annotations). No prep needed.
+Debug data is bundled in `data/afthink_debug/` (2 wav files, a few annotations). No prep needed.
 
 ```bash
 wget -O pretrained/BEATs_iter3_plus_AS2M_finetuned_on_AS2M_cpt2.pt \
@@ -152,7 +152,7 @@ train.py                        training
 models/salmonn.py               SALMONN, MuToR, SPARE classes
 recipes/afthink/                configs + data prep
 eval/                           eval + analysis
-resource/afthink_debug/         bundled debug data
+data/afthink_debug/             bundled debug data
 ```
 
 ## Cite

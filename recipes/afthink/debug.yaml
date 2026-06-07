@@ -43,9 +43,9 @@ model:
   end_sym: "</s>"
 
 datasets:
-  train_ann_path: "resource/afthink_debug/train_afthink.json"
-  valid_ann_path: "resource/afthink_debug/train_afthink.json"
-  test_ann_path: "resource/afthink_debug/test_afthink.json"
+  train_ann_path: "data/afthink_debug/train_afthink.json"
+  valid_ann_path: "data/afthink_debug/train_afthink.json"
+  test_ann_path: "data/afthink_debug/test_afthink.json"
 
   whisper_path: "pretrained/whisper-tiny"
 
