@@ -79,10 +79,10 @@ Downloads Whisper-large-v2, BEATs, Vicuna-13B, and `salmonn_v1.pth` into `pretra
 
 ### Training Data
 
-Fine-tuning uses [AF-Think](https://huggingface.co/datasets/nvidia/AF-Think) labels on a YouTube8M subset (160k train / 40k val in the paper). Each sample has four chapters: `<SUMMARY>`, `<CAPTION>`, `<REASONING>`, `<CONCLUSION>`.
+Fine-tuning uses [AF-Think](https://huggingface.co/datasets/nvidia/AF-Think) CoT labels on a [YouTube-8M](https://research.google.com/youtube8m/) audio subset (160k train / 40k val in the paper). Each sample has four chapters: `<SUMMARY>`, `<CAPTION>`, `<REASONING>`, `<CONCLUSION>`.
 
-1. Put `AFThink.tar.gz` at `data/YouTube8M/AFThink.tar.gz`
-2. `python recipes/afthink/prepare_cot_youtube8m.py`
+1. Download audio from [YouTube-8M](https://research.google.com/youtube8m/) ([download page](https://research.google.com/youtube8m/download.html)) and place files under `data/YouTube8M/audio_files/`
+2. `python recipes/afthink/prepare_af_youtube8m.py` (downloads AF-Think labels from HuggingFace, matches local audio, writes `data/YouTube8M/annotations/train_youtube8m.json` and `test_youtube8m.json`)
 3. Resample mp3 → 16 kHz wav:
 
 ```bash
