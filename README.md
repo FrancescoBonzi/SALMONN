@@ -1,10 +1,12 @@
 # SPARE
 
+![SPARE training framework](resource/spare_method.svg)
+
 Reference code for **SPARE** (Semantic Prediction for Audio REasoning), from the paper *Enhancing Audio Reasoning via Semantic Summary Prediction* (Interspeech 2026).
 
 Built on [SALMONN 13B](https://github.com/bytedance/SALMONN).
 
-## what is this
+## What is this
 
 Large audio-language models often have a **reasoning gap**: explicit chain-of-thought (CoT) hurts accuracy because attention drifts from the audio to the text the model already generated.
 
@@ -22,8 +24,6 @@ L = L_CE + λ · L_align     (λ = 2.0 in the paper)
 
 At inference, `[REG]` and the projection head are dropped. Same decoding as standard SFT, zero extra cost.
 
-![SPARE training framework](resource/spare_method.png)
-
 **Results** (zero-shot, SALMONN 13B backbone, MMAU / MMAR):
 
 | Method | MMAU | MMAR |
@@ -34,7 +34,7 @@ At inference, `[REG]` and the projection head are dropped. Same decoding as stan
 | Audio MuToR | 53.0% | 38.4% |
 | **SPARE** | **58.0%** | **40.3%** |
 
-## install
+## Install
 
 ```bash
 git clone <this-repo>
@@ -45,7 +45,7 @@ pip install -r requirements.txt huggingface_hub
 
 GPU recommended. Full pretrained weights ~80GB. Debug runs with tiny models.
 
-## quick start (debug)
+## Quick Start (Debug)
 
 Debug data is bundled in `resource/afthink_debug/` (2 wav files, a few annotations). No prep needed.
 
@@ -67,9 +67,9 @@ python eval/visualize_attention.py \
   --options model.ckpt=outputs/afthink_debug/<run_id>/checkpoint_best.pth
 ```
 
-## full experiments
+## Full Experiments
 
-### pretrained models
+### Pretrained Models
 
 ```bash
 bash recipes/download_pretrained.sh
@@ -77,7 +77,7 @@ bash recipes/download_pretrained.sh
 
 Downloads Whisper-large-v2, BEATs, Vicuna-13B, and `salmonn_v1.pth` into `pretrained/`.
 
-### training data
+### Training Data
 
 Fine-tuning uses [AF-Think](https://huggingface.co/datasets/nvidia/AF-Think) labels on a YouTube8M subset (160k train / 40k val in the paper). Each sample has four chapters: `<SUMMARY>`, `<CAPTION>`, `<REASONING>`, `<CONCLUSION>`.
 
@@ -95,7 +95,7 @@ find . -maxdepth 1 -name "*.mp3" -print0 | \
 
 **MMAR** eval: `python recipes/mmar/prepare_mmar.py`.
 
-### train
+### Train
 
 Recipes in `recipes/afthink/`. Set `datasets.*_ann_path` in the yaml (shipped empty). Paper configs:
 
@@ -124,7 +124,7 @@ Or the full train + eval pipeline:
 MODEL_TYPE=bert_conclusion_spare bash run_youtube8m.sh
 ```
 
-## eval
+## Eval
 
 Benchmarks: [MMAU](https://arxiv.org/abs/2410.19168) and [MMAR](https://arxiv.org/abs/2505.03054). Evaluations are zero-shot with `--prompt-type afthink` (CoT output, conclusion extracted for scoring).
 
@@ -139,13 +139,13 @@ python eval/evaluate_mmau.py \
 
 MMAR: same with `eval/evaluate_mmar.py`. Shell wrappers: `bash eval/eval_benchmarks.sh`, `bash eval/eval_benchmarks_salmonn_.sh` (pretrained baseline), `bash eval/eval_attention.sh`.
 
-## qualitative analysis
+## Qualitative Analysis
 
 - `eval/visualize_attention.py` — attention maps (mechanistic analysis from the paper)
 - `eval/analyze_mmau_caption_words.py` — caption length vs correctness
 - `eval/compare_model_outputs.py` — overlap of correct samples between two runs
 
-## structure
+## Structure
 
 ```
 train.py                        training
@@ -155,7 +155,7 @@ eval/                           eval + analysis
 resource/afthink_debug/         bundled debug data
 ```
 
-## cite
+## Cite
 
 ```bibtex
 @inproceedings{spare2026,
@@ -163,12 +163,5 @@ resource/afthink_debug/         bundled debug data
   author={Anonymous},
   booktitle={Interspeech},
   year={2026}
-}
-
-@inproceedings{tang2024salmonn,
-  title={{SALMONN}: Towards Generic Hearing Abilities for Large Language Models},
-  author={Changli Tang and Wenyi Yu and Guangzhi Sun and Xianzhao Chen and Tian Tan and Wei Li and Lu Lu and Zejun MA and Chao Zhang},
-  booktitle={ICLR},
-  year={2024}
 }
 ```
