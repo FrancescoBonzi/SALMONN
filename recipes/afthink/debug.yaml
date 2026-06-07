@@ -61,11 +61,11 @@ run:
   accum_grad_iters: 1
   batch_size_train: 2
   batch_size_eval: 2
-  num_workers: 2
+  num_workers: 0
 
-  device: "cuda"
+  device: "cpu"
   use_distributed: False
-  amp: True
+  amp: False
   world_size: 1
   dist_url: "env://"
 
