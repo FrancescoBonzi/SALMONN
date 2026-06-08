@@ -1,0 +1,24 @@
+{
+    "annotation": [
+      {
+        "path": "data/librispeech_debug/samples/1272-128104-0000.flac",
+        "text": "mister quilter is the apostle of the middle classes and we are glad to welcome his gospel",
+        "task": "asr"
+      },
+      {
+        "path": "data/librispeech_debug/samples/1272-128104-0001.flac",
+        "text": "nor is mister quilter's manner less interesting than his matter",
+        "task": "asr"
+      },
+      {
+        "path": "data/librispeech_debug/samples/1272-128104-0000.flac",
+        "text": "mister quilter is the apostle of the middle classes and we are glad to welcome his gospel",
+        "task": "asr"
+      },
+      {
+        "path": "data/librispeech_debug/samples/1272-128104-0001.flac",
+        "text": "nor is mister quilter's manner less interesting than his matter",
+        "task": "asr"
+      }
+    ]
+  }

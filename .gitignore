@@ -166,3 +166,12 @@ launch.sh
 /output
 arnold.sh
 /configs_local
+
+.vscode/
+pretrained/
+outputs/
+notebooks/
+annotations/
+test-mini-audios.tar
+mmau_caption_analysis_out/
+data/MMAU/
